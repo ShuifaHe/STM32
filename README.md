@@ -19,3 +19,5 @@ STM32 CM3 Project
 
 
 五、高效节能：消抖无须延时等待，同时采取自适应变频扫键、键盘闲置检测、消抖读键双进程周期差异等多项智能措施尽量减少占用CPU的计算资源。
+
+（完整工程示例分享请移步http://www.openedv.com/forum.php?mod=viewthread&tid=277263&extra=page%3D1）
