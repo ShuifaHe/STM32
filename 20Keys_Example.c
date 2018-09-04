@@ -1,32 +1,32 @@
-//ÕâÀï¾ÙÒ»¸ö4*4¾ØÕó¼üÅÌÁí¼ÓÖ±Áª4¸ö·½Ïò¼ü£¬¹²20¸ö°´¼üµÄ·¶Àı
+//è¿™é‡Œå†ä¸¾ä¸€ä¸ª4*4çŸ©é˜µé”®ç›˜å¦åŠ ç›´è”4ä¸ªæ–¹å‘é”®ï¼Œå…±20ä¸ªæŒ‰é”®çš„èŒƒä¾‹
 
-//ÉèPD3¡¢PD4¡¢PD5¡¢PD6ÎªÆÕÍ¨Ö±Áª¶Ë¿ÚµÄËÄ¸ö¼ü£¨ÉÏÏÂ×óÓÒ·½Ïò¼ü£©
+//è®¾PD3ã€PD4ã€PD5ã€PD6ä¸ºæ™®é€šç›´è”ç«¯å£çš„å››ä¸ªé”®ï¼ˆä¸Šä¸‹å·¦å³æ–¹å‘é”®ï¼‰
 
-//4*4ĞĞÁĞÊ½¾ØÕó¼üÅÌÓ²¼şÁ¬½Ó£º
-//ÉèPD8¡¢PD9¡¢PD10¡¢PD11ÎªĞĞÁĞÊ½¼üÅÌµÄ°´¼üÊäÈë£¨Îª·½±ã¶ÁÈ¡£¬Õâ4¸öIO¿Ú¾¡Á¿·ÖÅäÎªÁ¬ĞøÒı½ÅºÅ£©
-//ÉèPD12¡¢PD13¡¢PD14¡¢PD15ÎªĞĞÁĞÊ½¼üÅÌµÄÉ¨ÃèÊä³ö£¨Õâ4¸öIO¿ÚËæÒâ£©
+//4*4è¡Œåˆ—å¼çŸ©é˜µé”®ç›˜ç¡¬ä»¶è¿æ¥ï¼š
+//è®¾PD8ã€PD9ã€PD10ã€PD11ä¸ºè¡Œåˆ—å¼é”®ç›˜çš„æŒ‰é”®è¾“å…¥ï¼ˆä¸ºæ–¹ä¾¿è¯»å–ï¼Œè¿™4ä¸ªIOå£å°½é‡åˆ†é…ä¸ºè¿ç»­å¼•è„šå·ï¼‰
+//è®¾PD12ã€PD13ã€PD14ã€PD15ä¸ºè¡Œåˆ—å¼é”®ç›˜çš„æ‰«æè¾“å‡ºï¼ˆè¿™4ä¸ªIOå£éšæ„ï¼‰
 
-#define KeyNumMax					20			//Ó²¼şÊµÌå°´¼üÊıÁ¿4*4+4=20¸ö
-typedef	u32 KeyS_Type;//¶¨Òå×´Ì¬×ÖÎª32Î»Êı¾İÀàĞÍ
+#define KeyNumMax					20			//ç¡¬ä»¶å®ä½“æŒ‰é”®æ•°é‡4*4+4=20ä¸ª
+typedef	u32 KeyS_Type;//å®šä¹‰çŠ¶æ€å­—ä¸º32ä½æ•°æ®ç±»å‹
 
-#define KEY_OUT_LINE_NULL	GPIOD->BRR = 0x0f<<12	/*Çå³ıËùÓĞÊä³ö*/
-#define KEY_OUT_LINE1		GPIOD->BSRR = 0x01<<12	/*É¨ÃèÊä³öµÚÒ»ĞĞ*/
-#define KEY_OUT_LINE2		GPIOD->BSRR = 0x02<<12	/*É¨ÃèÊä³öµÚ¶şĞĞ*/
-#define KEY_OUT_LINE3		GPIOD->BSRR = 0x04<<12	/*É¨ÃèÊä³öµÚÈıĞĞ*/
-#define KEY_OUT_LINE4		GPIOD->BSRR = 0x08<<12	/*É¨ÃèÊä³öµÚËÄĞĞ*/
+#define KEY_OUT_LINE_NULL	GPIOD->BRR = 0x0f<<12	/*æ¸…é™¤æ‰€æœ‰è¾“å‡º*/
+#define KEY_OUT_LINE1		GPIOD->BSRR = 0x01<<12	/*æ‰«æè¾“å‡ºç¬¬ä¸€è¡Œ*/
+#define KEY_OUT_LINE2		GPIOD->BSRR = 0x02<<12	/*æ‰«æè¾“å‡ºç¬¬äºŒè¡Œ*/
+#define KEY_OUT_LINE3		GPIOD->BSRR = 0x04<<12	/*æ‰«æè¾“å‡ºç¬¬ä¸‰è¡Œ*/
+#define KEY_OUT_LINE4		GPIOD->BSRR = 0x08<<12	/*æ‰«æè¾“å‡ºç¬¬å››è¡Œ*/
 
-#define KEY_IN		(GPIOD->IDR&(GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|GPIO_Pin_11))/*É¨ÃèÊäÈëÖµ*/
-#define KEY_IN0		(KEY_IN>>8)	/*»ñÈ¡ÊäÈëÒÆÎ»µ½µÍ¶Ë£¨¼ÙÈçÊÇPD0£­3µÄ»°¾Í¸ü¼òµ¥£¬²»ÓÃÒÆÎ»ÁË£©*/
-
-
-//°´¼üÓ²¼ş¶Á¶Ë¿ÚÎ»ÖÃ
-#define KB_RIGHT_IN  	PDin(3)//¶ÁÈ¡°´¼ü0 
-#define KB_DOWN_IN  	PDin(4)//¶ÁÈ¡°´¼ü1 
-#define KB_LEFT_IN  	PDin(5)//¶ÁÈ¡°´¼ü2 
-#define KB_UP_IN 	PDin(6)//¶ÁÈ¡°´¼ü3 
+#define KEY_IN		(GPIOD->IDR&(GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|GPIO_Pin_11))/*æ‰«æè¾“å…¥å€¼*/
+#define KEY_IN0		(KEY_IN>>8)	/*è·å–è¾“å…¥ç§»ä½åˆ°ä½ç«¯ï¼ˆå‡å¦‚æ˜¯PD0ï¼3çš„è¯å°±æ›´ç®€å•ï¼Œä¸ç”¨ç§»ä½äº†ï¼‰*/
 
 
-//20¸öÓ²¼şÊµÌå°´¼üµÄ±àºÅ£¬¼üÌ¬×ÖÒÀ´ËË³Ğò°´Î»×éºÏ
+//æŒ‰é”®ç¡¬ä»¶è¯»ç«¯å£ä½ç½®
+#define KB_RIGHT_IN  	PDin(3)//è¯»å–æŒ‰é”®0 
+#define KB_DOWN_IN  	PDin(4)//è¯»å–æŒ‰é”®1 
+#define KB_LEFT_IN  	PDin(5)//è¯»å–æŒ‰é”®2 
+#define KB_UP_IN 	PDin(6)//è¯»å–æŒ‰é”®3 
+
+
+//20ä¸ªç¡¬ä»¶å®ä½“æŒ‰é”®çš„ç¼–å·ï¼Œé”®æ€å­—ä¾æ­¤é¡ºåºæŒ‰ä½ç»„åˆ
 #define KB_RIGHT 		0
 #define KB_DOWN  		1
 #define KB_LEFT  		2 
@@ -34,50 +34,50 @@ typedef	u32 KeyS_Type;//¶¨Òå×´Ì¬×ÖÎª32Î»Êı¾İÀàĞÍ
 #define KB_NUM1 		4
 #define KB_NUM2 		5
 #define KB_NUM3 		6
-#define KB_BACK 		7//ÍË¸ñ¼ü
+#define KB_BACK 		7//é€€æ ¼é”®
 #define KB_NUM4 		8
 #define KB_NUM5			9
 #define KB_NUM6 		10
-#define KB_SPACE 		11//¿Õ¸ñ¼ü
+#define KB_SPACE 		11//ç©ºæ ¼é”®
 #define KB_NUM7 		12
 #define KB_NUM8 		13
 #define KB_NUM9 		14
 #define KB_ESC	 		15
-#define KB_XING 		16//*ºÅ¼ü
+#define KB_XING 		16//*å·é”®
 #define KB_NUM0 		17
-#define KB_JING 		18//#ºÅ¼ü
-#define KB_ENTER 		19//»Ø³µ¼ü
-//***************ÒÔÉÏÄÚÈİ¿ÉĞ´ÔÚkey.h ÎÄ¼şÖĞ********
+#define KB_JING 		18//#å·é”®
+#define KB_ENTER 		19//å›è½¦é”®
+//***************ä»¥ä¸Šå†…å®¹å¯å†™åœ¨key.h æ–‡ä»¶ä¸­********
 
 
-//*************** key.c ÎÄ¼şÏàÓ¦ÄÚÈİ ********
-//°´¼ü³õÊ¼»¯º¯Êı
-void KEY_Init(void) //IO³õÊ¼»¯
+//*************** key.c æ–‡ä»¶ç›¸åº”å†…å®¹ ********
+//æŒ‰é”®åˆå§‹åŒ–å‡½æ•°
+void KEY_Init(void) //IOåˆå§‹åŒ–
 { 
 	GPIO_InitTypeDef GPIO_InitStructure;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
 
-	/* PD8,9,10,11°´¼üÊäÈë*/
+	/* PD8,9,10,11æŒ‰é”®è¾“å…¥*/
 	GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|GPIO_Pin_11;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;		// ÏÂÀ­ÊäÈë
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//50MÊ±ÖÓËÙ¶È
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;		// ä¸‹æ‹‰è¾“å…¥
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//50Mæ—¶é’Ÿé€Ÿåº¦
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
-	/* PD12,13,14,15°´¼üÉ¨ÃèÊä³ö*/
+	/* PD12,13,14,15æŒ‰é”®æ‰«æè¾“å‡º*/
 	GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	//ÍÆÍìÊä³ö
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//50MÊ±ÖÓËÙ¶È
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	//æ¨æŒ½è¾“å‡º
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//50Mæ—¶é’Ÿé€Ÿåº¦
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	
-	/* PD3,4,5,6°´¼üÊäÈë,¶ÔÓ¦ËÄ¸ö·½Ïò¼ü*/
+	/* PD3,4,5,6æŒ‰é”®è¾“å…¥,å¯¹åº”å››ä¸ªæ–¹å‘é”®*/
 	GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_3|GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_6;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;		//ÉÏÀ­ÊäÈë
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//50MÊ±ÖÓËÙ¶È
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;		//ä¸Šæ‹‰è¾“å…¥
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//50Mæ—¶é’Ÿé€Ÿåº¦
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 }
 
 
-//Ó²¼ş°´¼ü±àÂë
-//ÒÔÉÏÊö20¼üÎªÀı£¨×î´óÔİÖ§³Ö32¼ü£¬¶ÔÓÚ¼üÉÙµÄÏµÍ³ KeyS_Type¿É¶¨ÒåÎªu16»òu8£©
+//ç¡¬ä»¶æŒ‰é”®ç¼–ç 
+//ä»¥ä¸Šè¿°20é”®ä¸ºä¾‹ï¼ˆæœ€å¤§æš‚æ”¯æŒ32é”®ï¼Œå¯¹äºé”®å°‘çš„ç³»ç»Ÿ KeyS_Typeå¯å®šä¹‰ä¸ºu16æˆ–u8ï¼‰
 KeyS_Type GetHalKeyCode(void)
 {
 	KeyS_Type ktmp=0;
@@ -85,22 +85,22 @@ KeyS_Type GetHalKeyCode(void)
 	if(!KB_DOWN_IN) 	ktmp|=1<<KB_DOWN;
 	if(!KB_LEFT_IN) 	ktmp|=1<<KB_LEFT;
 	if(!KB_UP_IN) 		ktmp|=1<<KB_UP;
-		//É¨ÃèĞĞÁĞÊ½¼üÅÌ
+		//æ‰«æè¡Œåˆ—å¼é”®ç›˜
 	KEY_OUT_LINE_NULL;
 	KEY_OUT_LINE1;
-	ktmp |= KEY_IN0<<4;		//»òÕßÖ±½ÓKEY_IN>>4
+	ktmp |= KEY_IN0<<4;		//æˆ–è€…ç›´æ¥KEY_IN>>4
 
 	KEY_OUT_LINE_NULL;
 	KEY_OUT_LINE2;
-	ktmp |= KEY_IN0<<8;		//»òÕßÖ±½ÓKEY_IN
+	ktmp |= KEY_IN0<<8;		//æˆ–è€…ç›´æ¥KEY_IN
 
 	KEY_OUT_LINE_NULL;
 	KEY_OUT_LINE3;
-	ktmp |= KEY_IN0<<12;		//»òÕßÖ±½ÓKEY_IN<<4
+	ktmp |= KEY_IN0<<12;		//æˆ–è€…ç›´æ¥KEY_IN<<4
 
 	KEY_OUT_LINE_NULL;
 	KEY_OUT_LINE4;
-	ktmp |= KEY_IN0<<16;		//»òÕßÖ±½ÓKEY_IN<<8
+	ktmp |= KEY_IN0<<16;		//æˆ–è€…ç›´æ¥KEY_IN<<8
 
 	return ktmp;
 }
