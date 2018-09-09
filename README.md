@@ -15,7 +15,7 @@ static void SYSCLKConfig_STOP(void)
 {  
   /* 从STOP模式唤醒后重新配置系统时钟 */
   /* 使能 HSE */
-  RCC_HSEConfig(RCC_HSE_ON);
+		RCC_HSEConfig(RCC_HSE_ON);
   
   /* 等待HSE时钟就绪 */
   while (RCC_GetFlagStatus(RCC_FLAG_HSERDY) == RESET)
