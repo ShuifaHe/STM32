@@ -10,6 +10,7 @@ BITBAND宏定义：
   * 本函数用于从STOP模式唤醒后重新配置系统时钟：使能HSE，PLL并选择PLL作为系统时钟源
   *         
   */
+  
 static void SYSCLKConfig_STOP(void)
 {  
   /* 从STOP模式唤醒后重新配置系统时钟 */
@@ -18,7 +19,7 @@ static void SYSCLKConfig_STOP(void)
   
   /* 等待HSE时钟就绪 */
   while (RCC_GetFlagStatus(RCC_FLAG_HSERDY) == RESET)
-  {}  
+  {}
   
   /* 使能PLL */
   RCC_PLLCmd(ENABLE);
@@ -26,12 +27,12 @@ static void SYSCLKConfig_STOP(void)
   /* 等待PLL就绪 */
   while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
   {}
-  
-  /* 选择PLL作为系统时钟源 */
-  RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
-  
-  /* 等待时钟源配置就绪 */
-  while (RCC_GetSYSCLKSource() != 0x08)
+ 
+ /* 选择PLL作为系统时钟源 */
+ RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+
+/* 等待时钟源配置就绪 */
+while (RCC_GetSYSCLKSource() != 0x08)
   {}
 }
 
