@@ -18,7 +18,7 @@ STM32 CM3 Project
 		bTIM_CR_DIR（bTIMx)=1或0;						//多组外设
 		bGPIO_BRR(bGPIOx,n)=1或0;					//多组外设多个端口
 多BIT位访问方式：
-		SET_RCC_PLLMUL(a);	写	 					//唯一外设
+		SET_RCC_PLLMUL(a);	写	 				//唯一外设
 		GET_RCC_PLLMUL;			读
 		SET_SPI_CR_BR(bSPIx,a);	写						//多组外设
 		GET_SPI_CR_BR(bSPIx);		读		
