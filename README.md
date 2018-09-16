@@ -17,7 +17,7 @@ STM32 CM3 Project
 单BIT位访问方式：
 		bRCC_ENABLE_RTC=1或0; 						//唯一外设
 		bTIM_CR_DIR（bTIMx)=1或0;						//多组外设
-		bGPIO_BRR(bGPIOx,n)=1或0;							//多组外设多个端口
+		bGPIO_BRR(bGPIOx,n)=1或0;					//多组外设多个端口
 多BIT位访问方式：
 		SET_RCC_PLLMUL(a);	写	 					//唯一外设
 		GET_RCC_PLLMUL;			读
