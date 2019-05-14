@@ -21,7 +21,9 @@ STM32 CM3 Project
 
 单BIT位访问方式：
 		bRCC_ENABLE_RTC=1或0; 																	//唯一外设
+		
 		bTIM_CR_DIR（bTIMx)=1或0;																	//多组外设
+		
 		bGPIO_BRR(bGPIOx,n)=1或0;																//多组外设多个端口
 					也可读，或者用于逻辑判断，EX：if(!bRCC_ENABLE_RTC)
     
