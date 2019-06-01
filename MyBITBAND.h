@@ -1,47 +1,114 @@
 #ifndef __MYBITBAND_H
 #define __MYBITBAND_H	  
-//#include <stm32f10x.h>  
+//#include <stm32f10x.h>  //本文件仅依赖于此一头文件，一般工程都已经包含了该文件，故此处可省去。
+
+
+
 /****************************** 本人逐步实现的寄存器位操作模式 ***************************************/
-// 利用本文件，可以比较方便、高效精准地以位段方式访问寄存器，结合多BIT访问等方式，能够最终完全抛开库函数。
+
+// 利用本文件，可以比较方便、高效精准地以位段方式访问寄存器，结合多BIT访问、寄存器直接访问等方式，能够最终完全抛开库函数。
+
 // 一、以外设原有名称为基础，在外设名称前面加前缀b, 与库函数区分的同时，指示这用作bitband操作。
+
 // 二、进一步强化助记，将部分具体寄存器名称弱化,比如某外设有多个控制寄存器CR1、CR2、CR3，则统一省略为CR，不必记忆是第几个CR。
 // 尝试对于常用的外设如RCC，进一步根据功能进行了改造，比如将所有使能时钟控制归纳成bRCC_ENABLE_XXX（其中XXX为外设名），
-// 便于记忆，不用再考虑某外设挂在哪条具体总线上等细节，相当于进行了一个小的二次封装。
+// 便于记忆，不用再考虑某外设挂在哪条具体总线上等细节，相当于进行了一个小小的二次封装。
+
 // 三、BIT位的名称尽量采用原名称，以便对照查阅芯片数据手册。寄存器地址偏移量按一般用户手册以十六进制填充。
+
 // 四、考虑到位操作的优势在精准高效地对位进行操作，这也是编写此文件的出发点。但考虑到两位以上的组合操作也无法避免，
 // 并且直接访问寄存器某几位也比较麻烦, 这里采用带参的宏定义制定了统一的访问格式.
-// 五、对于一般没有位定义、通常整字访问的寄存器，这里也定义了形如wBKP_DR1的宏指令方式对其进行访问， 即：wBKP_DR1的效果等同于寄存器直接访问的BKP->DR1
+
+// 五、对于一般没有位定义、通常整字访问的寄存器，仍可沿用传统的寄存器方式，这里也尝试定义了形如wBKP_DR1的宏指令方式对其进行访问， 
+// 即：wRTC_ALRH的效果等同于寄存器直接访问的RTC->ALRH；
+// 而对于有多个同类外设时，对于外设某寄存器整体的读写，则引入类似如下的宏定义，
+//			pTIM(bTIM3)->PSC	前缀“p”表示这是一个指向结构体的指针，等效于寄存器直接访问的TIM3->DR1
+// 但引入带参宏定义的好处是，实现了与访问多组外设单BIT位或多BIT位时形参的统一，便于移植
+
 // CopyRight By Warship
 // Created date: 	20180916
-// Modified date: 20190512
+// Modified date: 20190522
 
 /************************** 位段操作统一格式 *******************************************
 单BIT位访问方式：
 		bRCC_ENABLE_RTC=1或0; 														//唯一外设
-		bTIM_CR_DIR（bTIMx)=1或0;													//多组外设
-		bGPIO_BRR(bGPIOx,n)=1或0;													//多组外设多个端口
+		bTIM_CR_DIR（bTIM2)=1或0;													//多组外设
+		bGPIO_BRR(bGPIOA,n)=1或0;													//多组外设多个端口
 		也可读，或者用于逻辑判断，EX：if(!bRCC_ENABLE_RTC)
     
 多BIT位访问方式：
 		SET_RCC_PLLMUL(a);(设置PLL倍频值为a)			写	 							//唯一外设
 		val=GET_RCC_PLLMUL;(获取PLL倍频设置值)		读
 
-		SET_SPI_CR_BR(bSPIx,a);	(设置bSPIx接口的速率值为a)	写			//多组外设
-		val=GET_SPI_CR_BR(bSPIx);(获取bSPIx接口的速率值)		读
+		SET_SPI_CR_BR(bSPI2,a);	(设置bSPI2接口的速率值为a)	写			//多组外设
+		val=GET_SPI_CR_BR(bSPI1);(获取bSPI1x接口的速率值)		读
 
 寄存器整体访问方式：
-		wBKP_DR1			（读或写）		等效于寄存器直接访问的BKP->DR1
-															部分寄存器没有设置宏定义，请沿用上述寄存器直接访问方式
+  唯一外设时，		
+		wBKP_DR1			（读或写）		等效于寄存器直接访问的BKP->DR1，
+		可能有部分寄存器没有设置宏定义，请沿用上述寄存器直接访问方式
+		
+ 多个外设时，
+    对于外设某寄存器整体的读写，请尽量使用下列宏定义，
+			pTIM(bTIM3)->PSC					等效于寄存器直接访问的TIM3->DR1
+		这样，实现了与多组外设位访问时形参的统一，便于移植
+		
+
+   为减少宏定义的工作量，对于多个同类的外设，尤其是两个以上，如定时器、通信串口等，避免大量类似的宏定义
+使用带参数的宏，形如bCR_CEN(bTIM1),其中bTIM1为基址宏
+
+以b开头的基址宏定义（如bTIM1）的值，其原始本质就是一个u32的数值，所以
+当有需要，想将它也作为一个可变参数时，可以定义形参的类型为u32
+比如：想写一个设置任意SPI接口速率的函数
+可编写如下函数：
+	void SET_SPIx_SPEED(u32 MySPIx_Base, u8 SPI_SPEED)
+	{
+		SET_SPI_CR_BR(MySPIx_Base,SPI_SPEED);//设置SPI速率
+	}
+	调用时，入口参数MySPIx_Base分别使用bSPI1、bSPI2或bSPI3就可作用于不同的SPI口
+   另外，在编程需要时，可用
+((SPI_TypeDef *)MySPIx_Base)->DR; 取代SPIx->DR; 
+((SPI_TypeDef *)bSPI1)->DR;  			取代SPI1->DR;
+
+在进一步地增加了宏定义 #define pSPI(bSPIx)				((SPI_TypeDef *)bSPIx)
+之后，使得上两句可简写为：pSPI(bSPI1)->DR; //前缀“p”表示这是一个指向结构体的指针。
+接近了寄存器编程的风格，且使得bSPIx成了统一的参数，便于移植
+比如：下列函数即向串口发送一个字符，如果移植时，只须替换bURT1为bURT2就可以从串口1改成串口2
+void USART_SendData(u8 ch)
+ {
+  pURT(bURT1)->DR  = ch ;
+  while ( bURT_SR_TXE(bURT1) ==0 );
+ }
+对比一下，如果第一句仍沿用传统的寄存器访问风格，则移植的时候就需要修改两种符号：
+void USART_SendData(u8 ch)
+ {
+  USART1->DR  = ch ;
+  while ( bURT_SR_TXE(bURT1) ==0 );
+ }
+后者比前者需要增加的工作量：还须将USART1改成USART2 
+而且，前者还可以很容易地写成向任意串口发送字符的通用函数：
+void USART_SendData(u32 bURTx, u8 ch)
+ {
+  pURT(bURTx)->DR  = ch ;
+  while ( bURT_SR_TXE(bURTx) ==0 );
+ }
+ 
+ 															
 
 另外，本文件末附有当不使用位段操作而用逻辑运算实现相关操作的基本方法，供参考。
 不过这样就失去了位段操作的效率，同时代码的可读性也会变差
-**************************************************************************************/
 
-//为减少宏定义的工作量，对于多个相同的外设，尤其是两个以上，如定时器、串行通信等，避免大量类似的宏定义
-//使用带参数的宏，形如bCR_CEN(bTIM1),其中TIM1为基址宏
+**************************************************************************************/
 //以下统一定义的以b开头的基址宏，直接引用了stm32f10x.h中定义的xxx_BASE,
 //也可以不用这些定义，直接使用xxx_BASE
 //注意：可位段操作的外设地址区间为4000 0000－400F FFFF,基本上涵盖了绝大部分的外设。
+#define bGPIOA						GPIOA_BASE
+#define bGPIOB						GPIOB_BASE
+#define bGPIOC						GPIOC_BASE
+#define bGPIOD						GPIOD_BASE
+#define bGPIOE						GPIOE_BASE
+#define bGPIOF						GPIOF_BASE
+#define bGPIOG						GPIOG_BASE
 
 #define bURT1             USART1_BASE  
 #define bURT2             USART2_BASE
@@ -85,6 +152,21 @@
 #define bADC3							ADC3_BASE
 
 
+
+//多个外设时，对于外设某寄存器整体的读写，请尽量使用下列宏定义（便于代码移植，见本文件前面的示例解释）
+#define pGPIO(bGPIOx)			((GPIO_TypeDef *)bGPIOx)
+#define pURT(bURTx)				((USART_TypeDef *)bURTx)
+#define pTIM(bTIMx)				((TIM_TypeDef *)bTIMx)
+#define pSPI(bSPIx)				((SPI_TypeDef *)bSPIx)
+#define pI2C(bI2Cx)				((I2C_TypeDef *)bI2Cx)
+#define pCAN(bCANx)				((CAN_TypeDef *)bCANx)
+#define pDMA(bDMAx)				((DMA_TypeDef *)bDMAx)
+#define pADC(bADCx)				((ADC_TypeDef *)bADCx)
+//对于唯一外设，也可定义类似的宏，例如：
+//#define pIWDG							((IWDG_TypeDef *)IWDG_BASE)  //这种似乎意义不大
+//#define pRTC							((RTC_TypeDef *)RTC_BASE)
+//这样，就可以用pRTC->CNTL 等效于RTC->CNTL 但这种意义不大，故暂不定义，仍沿用RTC->CNTL 
+
 //多BIT位掩码宏定义
 #define 	MASKb1			((uint32_t)0x00000001)
 #define 	MASKb2			((uint32_t)0x00000003)
@@ -119,7 +201,10 @@
 #define 	MASKb31			((uint32_t)0x7FFFFFFF)
 #define 	MASKb32			((uint32_t)0xFFFFFFFF)
 
+
+//预定义多位访问宏，主要用于本文件内部使用：
 //寄存器多位访问宏定义：参数（寄存器地址、起始比特位、掩码（位数）、设置值）
+
 //本定义不限于位段使用，对于任何特定地址的存储器均可用
 #define SET_REG_BITn(REG_ADDR,Sbit,MASKn,a)  	(MEM_ADDR(REG_ADDR)=(MEM_ADDR(REG_ADDR)&(~(MASKn<<Sbit)))|((a & MASKn)<<Sbit))
 #define GET_REG_BITn(REG_ADDR,Sbit,MASKn)   	((MEM_ADDR(REG_ADDR)>>Sbit)& MASKn)
@@ -129,7 +214,7 @@
 /*                    PWR寄存器--电源控制寄存器                               */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bPWR_i									//定位索引
 /****************** PWR_CR--电源控制寄存器 ******************/
 #define  bPWR_CR_LPDS          BIT_ADDR(PWR_BASE, 0)     //深睡眠下的低功耗（PDDS=0时，与PDDS位协同操作）定义：0（在待机模式下电压调压器开启），1（在待机模式下电压调压器处于低功耗模式）
 #define  bPWR_CR_PDDS          BIT_ADDR(PWR_BASE, 1)     //掉电深睡眠（与LPDS位协同操作）定义：0（当CPU进入深睡眠时进入停机模式，调压器状态由LPDS位控制），1（CPU进入深睡眠时进入待机模式）
@@ -141,14 +226,14 @@
 //#define  PWR_CR_PLS  以下3BIT定义PVD电压阀值
 #define  SET_PWR_CR_PLS(a)   SET_REG_BITn(PWR_BASE,5,MASK3,a)
 //PVD电压阀值,示例：设置2.5V电压阀值时使用SET_PWR_CR_PLS(PVD_2V5);
-#define  PVD_2V2	0x000
-#define  PVD_2V3	0x001
-#define  PVD_2V4	0x010
-#define  PVD_2V5	0x011
-#define  PVD_2V6	0x100
-#define  PVD_2V7	0x101
-#define  PVD_2V8	0x110
-#define  PVD_2V9	0x111
+#define  PVD_2V2	0
+#define  PVD_2V3	1
+#define  PVD_2V4	2
+#define  PVD_2V5	3
+#define  PVD_2V6	4
+#define  PVD_2V7	5
+#define  PVD_2V8	6
+#define  PVD_2V9	7
 
 
 
@@ -164,9 +249,10 @@
 
 /******************************************************************************/
 /*                                                                            */
-/*                    EXIT寄存器--外部中断/事件控制器(n=0-18)                  */
+/*                    EXIT寄存器--外部中断/事件控制器(n=0-18)                 */
 /*                                                                            */
 /******************************************************************************/
+#define  bEXTI_i									//定位索引
 #define  bEXTI_INT_MASK(n)									BIT_ADDR(EXTI_BASE, n)    //中断屏蔽:0屏蔽,1不屏蔽
 #define  bEXTI_EVT_MASK(n)									BIT_ADDR(EXTI_BASE+4, n)  //事件屏蔽:0屏蔽,1不屏蔽
 #define  bEXTI_TRIG_RISE(n)									BIT_ADDR(EXTI_BASE+8, n)  //上升沿触发:0禁用,1使能,可与下降沿触发共存
@@ -177,11 +263,11 @@
 
 /******************************************************************************/
 /*                                                                            */
-/*                         RCC寄存器--复位和时钟控制                           */
+/*                         RCC寄存器--复位和时钟控制                          */
 /*                                                                            */
 /******************************************************************************/
 
-
+#define  bRCC_i									//定位索引
 /****************** RCC_CR--时钟控制寄存器 ******************/
 #define  bRCC_CLK_HSION        	BIT_ADDR(RCC_BASE, 0) //LSI时钟: 0禁用,1开启
 #define  bRCC_CLK_HSIRDY       	BIT_ADDR(RCC_BASE, 1) //LSI时钟状态由硬件控制(只读):0不可用,1就绪
@@ -207,9 +293,9 @@
 #define  SET_RCC_SW(a)  				SET_REG_BITn(RCC_BASE+0x04,0,MASKb2,a) 
 #define  GET_RCC_SW							GET_REG_BITn(RCC_BASE+0x04,0,MASKb2)
 
-#define  SW_HSI                     0x0       /*!< HSI 内部高速时钟被选择为系统时钟 */
-#define  SW_HSE                     0x1       /*!< HSE 外部高速时钟被选择为系统时钟 */
-#define  SW_PLL                     0x2       /*!< PLL 锁相环的输出被选择为系统时钟 */
+#define  SW_HSI     0x0       /*!< HSI 内部高速时钟被选择为系统时钟 */
+#define  SW_HSE     0x1       /*!< HSE 外部高速时钟被选择为系统时钟 */
+#define  SW_PLL     0x2       /*!< PLL 锁相环的输出被选择为系统时钟 */
 
 
 //系统时钟源指示BIT3:2,只读: 定义同上
@@ -271,21 +357,21 @@
 #define  SET_RCC_PLLMUL(a)   	SET_REG_BITn(RCC_BASE+0x04,18,MASKb4,a)
 #define  GET_RCC_PLLMUL		   	GET_REG_BITn(RCC_BASE+0x04,18,MASKb4)
 //取值定义如下：
-#define  PLLMULL2                  0        /*!< PLL 2倍频 */
-#define  PLLMULL3                  1        /*!< PLL 3倍频 */
-#define  PLLMULL4                  2       /*!< PLL 4倍频 */
-#define  PLLMULL5                  3        /*!< PLL 5倍频 */
-#define  PLLMULL6                  4        /*!< PLL 6倍频 */
-#define  PLLMULL7                  5        /*!< PLL 7倍频 */
-#define  PLLMULL8                  6        /*!< PLL 8倍频 */
-#define  PLLMULL9                  7        /*!< PLL 9倍频 */
-#define  PLLMULL10                 8        /*!< PLL 10倍频 */
-#define  PLLMULL11                 9        /*!< PLL 11倍频 */
-#define  PLLMULL12                 10        /*!< PLL 12倍频 */
-#define  PLLMULL13                 11        /*!< PLL 13倍频 */
-#define  PLLMULL14                 12        /*!< PLL 14倍频 */
-#define  PLLMULL15                 13        /*!< PLL 15倍频 */
-#define  PLLMULL16                 14        /*!< PLL 16倍频 */
+#define  PLLMULL2                  0        	/*!< PLL 2倍频 */
+#define  PLLMULL3                  1        	/*!< PLL 3倍频 */
+#define  PLLMULL4                  2       		/*!< PLL 4倍频 */
+#define  PLLMULL5                  3        	/*!< PLL 5倍频 */
+#define  PLLMULL6                  4        	/*!< PLL 6倍频 */
+#define  PLLMULL7                  5        	/*!< PLL 7倍频 */
+#define  PLLMULL8                  6        	/*!< PLL 8倍频 */
+#define  PLLMULL9                  7        	/*!< PLL 9倍频 */
+#define  PLLMULL10                 8        	/*!< PLL 10倍频 */
+#define  PLLMULL11                 9        	/*!< PLL 11倍频 */
+#define  PLLMULL12                 10        	/*!< PLL 12倍频 */
+#define  PLLMULL13                 11        	/*!< PLL 13倍频 */
+#define  PLLMULL14                 12        	/*!< PLL 14倍频 */
+#define  PLLMULL15                 13        	/*!< PLL 15倍频 */
+#define  PLLMULL16                 14        	/*!< PLL 16倍频 */
 
 ///*!< MCO configuration 注意不同的芯片有差异  3BIT的MCO控制位: 对MCU输出时钟的选择进行控制  */     
 #define  SET_RCC_MCO(a)   	SET_REG_BITn(RCC_BASE+0x04,24,MASKb3,a)
@@ -324,36 +410,53 @@
 
 /****************** RCC_APB2RSTR寄存器 ******************/
 #define  bRCC_RESET_AFIO                 	BIT_ADDR(RCC_BASE+0x0C, 0)   //0无效,1复位,下同
+
+#define  bRCC_RESET_GPIOn(n)             	BIT_ADDR(RCC_BASE+0x0C, (n+2))
+#define  bRCC_RESET_GPIOx(bGPIOx)        	BIT_ADDR(RCC_BASE+0x0C, (((bGPIOx-GPIOA_BASE)>>10)+2))
+
 #define  bRCC_RESET_GPIOA                 BIT_ADDR(RCC_BASE+0x0C, 2)
 #define  bRCC_RESET_GPIOB                 BIT_ADDR(RCC_BASE+0x0C, 3)
 #define  bRCC_RESET_GPIOC                 BIT_ADDR(RCC_BASE+0x0C, 4)
 #define  bRCC_RESET_GPIOD                 BIT_ADDR(RCC_BASE+0x0C, 5)
 #define  bRCC_RESET_GPIOE                 BIT_ADDR(RCC_BASE+0x0C, 6)
+#define  bRCC_RESET_GPIOF                 BIT_ADDR(RCC_BASE+0x0C, 7)
+#define  bRCC_RESET_GPIOG                 BIT_ADDR(RCC_BASE+0x0C, 8)
+
 #define  bRCC_RESET_ADC1                 	BIT_ADDR(RCC_BASE+0x0C, 9)
 #define  bRCC_RESET_ADC2                 	BIT_ADDR(RCC_BASE+0x0C, 10)
 #define  bRCC_RESET_TIM1                 	BIT_ADDR(RCC_BASE+0x0C, 11)
 #define  bRCC_RESET_SPI1                 	BIT_ADDR(RCC_BASE+0x0C, 12)
+#define  bRCC_RESET_TIM8                 	BIT_ADDR(RCC_BASE+0x0C, 13)
 #define  bRCC_RESET_USART1               	BIT_ADDR(RCC_BASE+0x0C, 14)
+#define  bRCC_RESET_ADC3                 	BIT_ADDR(RCC_BASE+0x0C, 15)
 
 
 /****************** RCC_APB1RSTR寄存器 ******************/
 #define  bRCC_RESET_TIM2                 BIT_ADDR(RCC_BASE+0x10, 0)   //0无效,1复位,下同
 #define  bRCC_RESET_TIM3                 BIT_ADDR(RCC_BASE+0x10, 1)
 #define  bRCC_RESET_TIM4                 BIT_ADDR(RCC_BASE+0x10, 2)
+#define  bRCC_RESET_TIM5                 BIT_ADDR(RCC_BASE+0x10, 3)   
+#define  bRCC_RESET_TIM6                 BIT_ADDR(RCC_BASE+0x10, 4)
+#define  bRCC_RESET_TIM7                 BIT_ADDR(RCC_BASE+0x10, 5)
 #define  bRCC_RESET_WWDG                 BIT_ADDR(RCC_BASE+0x10, 11)
 #define  bRCC_RESET_SPI2                 BIT_ADDR(RCC_BASE+0x10, 14)
+#define  bRCC_RESET_SPI3                 BIT_ADDR(RCC_BASE+0x10, 15)
 #define  bRCC_RESET_USART2               BIT_ADDR(RCC_BASE+0x10, 17)
 #define  bRCC_RESET_USART3               BIT_ADDR(RCC_BASE+0x10, 18)
+#define  bRCC_RESET_USART4               BIT_ADDR(RCC_BASE+0x10, 19)
+#define  bRCC_RESET_USART5               BIT_ADDR(RCC_BASE+0x10, 20)
 #define  bRCC_RESET_I2C1                 BIT_ADDR(RCC_BASE+0x10, 21)
 #define  bRCC_RESET_I2C2                 BIT_ADDR(RCC_BASE+0x10, 22)
 #define  bRCC_RESET_USB                  BIT_ADDR(RCC_BASE+0x10, 23)
 #define  bRCC_RESET_CAN               	 BIT_ADDR(RCC_BASE+0x10, 25)
 #define  bRCC_RESET_BKP                  BIT_ADDR(RCC_BASE+0x10, 27)
 #define  bRCC_RESET_PWR                  BIT_ADDR(RCC_BASE+0x10, 28)
+#define  bRCC_RESET_DAC                  BIT_ADDR(RCC_BASE+0x10, 29)
 
 
 /****************** RCC_AHBEN寄存器 ******************/
-#define  bRCC_ENABLE_DMA                   BIT_ADDR(RCC_BASE+0x14, 0)  //0关闭时钟,1开启时钟,下同
+#define  bRCC_ENABLE_DMA1                  BIT_ADDR(RCC_BASE+0x14, 0)  //0关闭时钟,1开启时钟,下同
+#define  bRCC_ENABLE_DMA2                  BIT_ADDR(RCC_BASE+0x14, 1)
 #define  bRCC_ENABLE_SRAM                  BIT_ADDR(RCC_BASE+0x14, 2)
 #define  bRCC_ENABLE_FLITF                 BIT_ADDR(RCC_BASE+0x14, 4)
 #define  bRCC_ENABLE_CRC                 	 BIT_ADDR(RCC_BASE+0x14, 6)
@@ -363,8 +466,13 @@
 
 /****************** RCC_APB2ENR寄存器 ******************/
 #define  bRCC_ENABLE_AFIO                 BIT_ADDR(RCC_BASE+0x18, 0)   //0关闭时钟,1开启时钟,下同
-#define  bRCC_ENABLE_GPIOx(n)             BIT_ADDR(RCC_BASE+0x18, (n+2))
+
+#define  bRCC_ENABLE_GPIOn(n)             BIT_ADDR(RCC_BASE+0x18, (n+2))
 //注意上面的n要用纯数字序号，0、1、2分别代表GPIOA、GPIOB、GPIOC等
+
+#define  bRCC_ENABLE_GPIOx(bGPIOx)        BIT_ADDR(RCC_BASE+0x18, (((bGPIOx-GPIOA_BASE)>>10)+2))
+
+
 
 #define  bRCC_ENABLE_GPIOA                 BIT_ADDR(RCC_BASE+0x18, 2)
 #define  bRCC_ENABLE_GPIOB                BIT_ADDR(RCC_BASE+0x18, 3)
@@ -377,23 +485,35 @@
 #define  bRCC_ENABLE_ADC2                 BIT_ADDR(RCC_BASE+0x18, 10)
 #define  bRCC_ENABLE_TIM1                 BIT_ADDR(RCC_BASE+0x18, 11)
 #define  bRCC_ENABLE_SPI1                 BIT_ADDR(RCC_BASE+0x18, 12)
+#define  bRCC_ENABLE_TIM8                 BIT_ADDR(RCC_BASE+0x18, 13)
 #define  bRCC_ENABLE_USART1               BIT_ADDR(RCC_BASE+0x18, 14)
+#define  bRCC_ENABLE_ADC3                 BIT_ADDR(RCC_BASE+0x18, 15)
 
 
 /****************** RCC_APB1ENR寄存器 ******************/
+
 #define  bRCC_ENABLE_TIM2                 BIT_ADDR(RCC_BASE+0x1C, 0)   //0关闭时钟,1开启时钟,下同
 #define  bRCC_ENABLE_TIM3                 BIT_ADDR(RCC_BASE+0x1C, 1)
 #define  bRCC_ENABLE_TIM4                 BIT_ADDR(RCC_BASE+0x1C, 2)
+#define  bRCC_ENABLE_TIM5                 BIT_ADDR(RCC_BASE+0x1C, 3)
+#define  bRCC_ENABLE_TIM6                 BIT_ADDR(RCC_BASE+0x1C, 4)
+#define  bRCC_ENABLE_TIM7                 BIT_ADDR(RCC_BASE+0x1C, 5)
 #define  bRCC_ENABLE_WWDG                 BIT_ADDR(RCC_BASE+0x1C, 11)
 #define  bRCC_ENABLE_SPI2                 BIT_ADDR(RCC_BASE+0x1C, 14)
+#define  bRCC_ENABLE_SPI3                 BIT_ADDR(RCC_BASE+0x1C, 15)
+
 #define  bRCC_ENABLE_USART2               BIT_ADDR(RCC_BASE+0x1C, 17)
 #define  bRCC_ENABLE_USART3               BIT_ADDR(RCC_BASE+0x1C, 18)
+#define  bRCC_ENABLE_USART4               BIT_ADDR(RCC_BASE+0x1C, 19)
+#define  bRCC_ENABLE_USART5               BIT_ADDR(RCC_BASE+0x1C, 20)
+
 #define  bRCC_ENABLE_I2C1                 BIT_ADDR(RCC_BASE+0x1C, 21)
 #define  bRCC_ENABLE_I2C2                 BIT_ADDR(RCC_BASE+0x1C, 22)
 #define  bRCC_ENABLE_USB                  BIT_ADDR(RCC_BASE+0x1C, 23)
 #define  bRCC_ENABLE_CAN               	  BIT_ADDR(RCC_BASE+0x1C, 25)
 #define  bRCC_ENABLE_BKP                  BIT_ADDR(RCC_BASE+0x1C, 27)
 #define  bRCC_ENABLE_PWR                  BIT_ADDR(RCC_BASE+0x1C, 28)
+#define  bRCC_ENABLE_DAC                  BIT_ADDR(RCC_BASE+0x1C, 29)
 
 //
 /****************** RCC_BDCR寄存器--备份区域控制 ******************/
@@ -429,7 +549,7 @@
 /*                                                                            */
 /******************************************************************************/
 
-
+#define  bAFIO_i									//定位索引
 /****************** AFIO_EVCR--事件控制寄存器 ******************/
 #define  bAFIO_EVCR_EVOE        		BIT_ADDR(AFIO_BASE, 7) 			//事件输出使能. 为1时,事件由指定的端口输出(端口由BIT6:4,引脚由BIT3:0决定)
 #define  SET_AFIO_EVCR_PIN(a)   	SET_REG_BITn(AFIO_BASE,0,MASKb4,a)	//事件输出指定的引脚(端口由下行的BIT6:4决定)
@@ -473,8 +593,10 @@
 /****************** AFIO_EXTICR1-4--外部中断配置寄存器 ******************/
 //4个外部中断配置寄存器EXTICR1-4, 控制16条中断线的端口组(分别用4BIT决定PA或PB/....../PG)的选择.
 #define  SET_AFIO_EXTICR(EXTI_n,a)   	SET_REG_BITn(AFIO_BASE+0x08+(EXTI_n&0x0c),(EXTI_n&0x03)<<2,MASKb4,a)
+//其作用是0－15这16条外部引脚作为外部中断源时，哪一组GPIO的相应引脚起作用。
+//比如想使用外部中断线2，需用该句来进一步确定是PA2还是PB2，还是PC2、PD2......PG2?
 //注意参数a为端口号，直接用数字序号0、1、2、3等分别表示GPIOA、GPIOB、GPIOC、GPIOD等
-//例如：设EXTI2为PD2，则使用SET_AFIO_EXTICR(2,GPIO_D);
+//例如：设EXTI2为PD2，则使用SET_AFIO_EXTICR(2,GPIO_PortSourceGPIOD);
 //***********以下为演算对照验证草稿，可删除
 //EXTIn		(EXTI_n&0x0c)	(EXTIn&0x03)<<2
 //0				0							0
@@ -499,11 +621,11 @@
 /*                         GPIOx寄存器                                        */
 /*                                                                            */
 /******************************************************************************/
-//GPIO的有关输出输入的位操作,可以用大家广泛使用的PAout(n)......PCin(n)的方式；
-
+#define  bGPIO_i									//定位索引
+/******************GPIOx_CRH/CRL（端口配置寄存器） ******************/
 //对GPIO的端口配置: 每线采用4BIT,可试用如下宏定义：
-#define  SET_GPIO_CR(GPIOx_BASE,PINx,mode)   	SET_REG_BITn(GPIOx_BASE+(PINx>>3)*4,(PINx & 0x07)<<2,MASKb4,mode)
-//其中的PINx使用端口的引脚序号，如PC7，则参数值为7;
+#define  SET_GPIO_PIN(bGPIOx,n,mode)   	SET_REG_BITn(bGPIOx+(n>>3)*4,(n & 0x07)<<2,MASKb4,mode)
+//对于n用0、1、2等分别代表Pin0、Pin1、Pin2等，如PC7，则参数值为7;		下同；
 //其中的mode取值如下：
 //	0					模拟输入 AIN
 //	4					浮空输入 IN_FLOATING
@@ -513,52 +635,84 @@
 //	7	（6/5）	通用开漏输出50MHz（2/10MHz）Out_OD
 //	B （A/9）	复用推挽输出50MHz（2/10MHz）AF_PP
 //	F	（E/D）	复用开漏输出50MHz（2/10MHz）AF_OD
+#define	AIN							0   //模拟输入
+#define	IN_FLOATING			4	//浮空输入
+#define	IPD							8	//下拉输入
+#define	IPU							8	//上拉输入
+//以下仅定义了常用的50MHz（其它频率请用上述注释括号中对应的数值）
+#define	Out_PP					3	//推挽输出
+#define	Out_OD					7	//开漏输出
+#define	AF_PP						0x0B	//复用推挽	
+#define	AF_OD						0x0F	//复用开漏
 
-//EX: 设置PC7为50M通用推挽输出：SET_GPIO_CR(GPIOC,7,3);
+//EX: 设置PC7为50M通用推挽输出：SET_GPIO(bGPIOC,7,Out_PP);
 
-//GPIO的端口配置锁定功能GPIOx_LCKR寄存器,适合采用位操作方式,但一般此功能不常用.
-#define  bGPIOA_BSRR(n)   BIT_ADDR(GPIOA_BASE+0x10, n)
-#define  bGPIOB_BSRR(n)   BIT_ADDR(GPIOB_BASE+0x10, n)
-#define  bGPIOC_BSRR(n)   BIT_ADDR(GPIOC_BASE+0x10, n)
-#define  bGPIOD_BSRR(n)   BIT_ADDR(GPIOD_BASE+0x10, n)
-#define  bGPIOE_BSRR(n)   BIT_ADDR(GPIOE_BASE+0x10, n)
-#define  bGPIOF_BSRR(n)   BIT_ADDR(GPIOF_BASE+0x10, n)
-#define  bGPIOG_BSRR(n)   BIT_ADDR(GPIOG_BASE+0x10, n)
-#define  bGPIOA_BRR(n)   	BIT_ADDR(GPIOA_BASE+0x14, n)
-#define  bGPIOB_BRR(n)   	BIT_ADDR(GPIOB_BASE+0x14, n)
-#define  bGPIOC_BRR(n)   	BIT_ADDR(GPIOC_BASE+0x14, n)
-#define  bGPIOD_BRR(n)   	BIT_ADDR(GPIOD_BASE+0x14, n)
-#define  bGPIOE_BRR(n)   	BIT_ADDR(GPIOE_BASE+0x14, n)
-#define  bGPIOF_BRR(n)   	BIT_ADDR(GPIOF_BASE+0x14, n)
-#define  bGPIOG_BRR(n)   	BIT_ADDR(GPIOG_BASE+0x14, n)
-#define  bGPIOA_LOCK(n)   BIT_ADDR(GPIOA_BASE+0x18, n)
-#define  bGPIOB_LOCK(n)   BIT_ADDR(GPIOB_BASE+0x18, n)
-#define  bGPIOC_LOCK(n)   BIT_ADDR(GPIOC_BASE+0x18, n)
-#define  bGPIOD_LOCK(n)   BIT_ADDR(GPIOD_BASE+0x18, n)
-#define  bGPIOE_LOCK(n)   BIT_ADDR(GPIOE_BASE+0x18, n)
-#define  bGPIOF_LOCK(n)   BIT_ADDR(GPIOF_BASE+0x18, n)
-#define  bGPIOG_LOCK(n)   BIT_ADDR(GPIOG_BASE+0x18, n)
-#define  bGPIOA_LOCKKEY   BIT_ADDR(GPIOA_BASE+0x18, 16)
-#define  bGPIOB_LOCKKEY   BIT_ADDR(GPIOB_BASE+0x18, 16)
-#define  bGPIOC_LOCKKEY   BIT_ADDR(GPIOC_BASE+0x18, 16)
-#define  bGPIOD_LOCKKEY   BIT_ADDR(GPIOD_BASE+0x18, 16)
-#define  bGPIOE_LOCKKEY   BIT_ADDR(GPIOE_BASE+0x18, 16)
-#define  bGPIOF_LOCKKEY   BIT_ADDR(GPIOF_BASE+0x18, 16)
-#define  bGPIOG_LOCKKEY   BIT_ADDR(GPIOG_BASE+0x18, 16)
 
-#define  bGPIOx_IDR(m,n)   BIT_ADDR(GPIOA_BASE+0x400*m+0x08, n)  //指定端口的指定位
-#define  bGPIOx_ODR(m,n)   BIT_ADDR(GPIOA_BASE+0x400*m+0x0C, n)  //指定端口的指定位
-#define  bGPIOx_BSRR(m,n)  BIT_ADDR(GPIOA_BASE+0x400*m+0x10, n) //置位指定端口的指定位
-#define  bGPIOx_BRR(m,n)   BIT_ADDR(GPIOA_BASE+0x400*m+0x14, n)  //复位指定端口的指定位
+//GPIO的有关输出输入的位操作,可以用大家广泛使用的PAout(n)......PCin(n)的方式；
+//也可以采用如下形式:
 
-//EX: 读取PC7的输入电平可使用：bGPIOx_IDR(GPIO_C,7)或bGPIOx_IDR(2,7)
-//以上的m、n要用纯数字序号，对于m用0、1、2等分别代表GPIOA、GPIOB、GPIOC等
-//对于n用0、1、2等分别代表Pin0、Pin1、Pin2等
+/******************GPIOx_IDR（端口输入寄存器） ******************/
+#define  bGPIOx_IDR(bGPIOx,n)   BIT_ADDR(bGPIOx+0x08, n)	//指定端口的指定位
+//这些位为只读并只能以16位的形式读出（对此有歧义，事实上位操作是可以的，我们所广泛采用的
+//PAin(7)或PAout(7)就是分别通过IDR或ODR寄存器进行单BIT的位段操作的，所以所谓的“只能以16位的形式”
+//或者下文中的“只能以字的形式操作”不影响位段操作的有效性，下文不再赘述）。
+//本操作读出的值为GPIOx第n号引脚的电平状态。
+
+//EX: 读取PC7的输入电平可使用：bGPIOx_IDR(bGPIOC,7)
+//对于n用0、1、2等分别代表Pin0、Pin1、Pin2等，下同；
+//整体访问可用：pGPIO(bGPIOx)->IDR	下同；
+
+/******************GPIOx_ODR（端口输出寄存器） ******************/
+#define  bGPIOx_ODR(bGPIOx,n)   BIT_ADDR(bGPIOx+0x0C, n)	//读写指定端口的指定位
+//这些位可读可写并只能以字的形式操作。注：对GPIOx_BSRR，可以分别的对各个ODR位进行独立的设置/清除。
+//整体访问可用：pGPIO(bGPIOx)->ODR	下同；
+
+/******************GPIOx_BSRR（端口置位复位寄存器） ******************/
+#define  bGPIOx_BSRR(bGPIOx,n)   BIT_ADDR(bGPIOx+0x10, n)
+//31-16位(高16位)：清除引脚端口n的位，这些位只能写入并只能以字的形式操作，
+//定义：0（对应的ODR位不产生影响），1（清除对应ODR位为0）																
+//15-0位（低16位）：设置引脚端口n的位，这些位只能写入并只能以字的形式操作，
+//定义：0（对应的ODR位不产生影响），1（设置对应ODR位为1）																
+//注：如果同时设置了同一对应引脚端口位的清除和设置，最终结果是设置为1起作用。																
+
+
+/******************GPIOx_BRR（端口复位寄存器） ******************/
+#define  bGPIOx_BRR(bGPIOx,n)   BIT_ADDR(bGPIOx+0x14, n)
+//清除端口GPIOx的第n位（n=15-0）这些位只能写入并只能以字的形式操作，
+//定义：0（对对应位无影响），1（清除对应位的ODR位为0）
+
+/******************GPIOx_LCKR（端口配置锁定寄存器） ******************/
+#define  bGPIOx_LOCK(bGPIOx,n)   BIT_ADDR(bGPIOx+0x18, n)
+//15-0位：GPIOx端口的第n（n=0-15）位是否锁定配置，这些位可读可写但只能在LCKK位为0时写入，
+//定义：0（不锁定端口的配置），1（锁定端口的配置）															
+
+#define  bGPIOx_LOCKKEY(bGPIOx)   BIT_ADDR(bGPIOx+0x18, 16)
+//16位：LCKK锁键，该位可随时读出，它只可通过锁键写入序列修改，
+//定义：0（端口配置锁键位激活），1（端口配置锁位被激活，下次复位前GPIOx_LCKR被锁住）															
+//      锁键写序列：写1-》写0-》写1-》读0-》读1 最后一个读可省略，但可以用来确认锁键已被激活															
+//      注：在操作锁键的写入序列时，不能改变LCK[15-0]的值，且操作写入序列中的任何错误将不能激活锁键															
+
+//以下是几个可能用到的GPIO端口标准库的值与通用序号之间的互转换计算
+//从GPIO端口数字序号获取端口寄存器地址：EX：0－－>bGPIOA
+#define GET_GPIOn_ADDR_BASE(gpio_num)	(GPIOA_BASE+((u32)gpio_num<<10))
+
+//从端口寄存器地址获取GPIO端口数字序号 EX：GPIOA－－>0 或者 bGPIOA－－>0
+#define GET_GPIO_num(GPIOx)		(((u32)GPIOx-GPIOA_BASE)>>10)
+
+//从GPIO引脚数字序号获取标准库的32位引脚值 EX：0－－>GPIO_Pin_0
+#define GET_GPIO_Pin(pin_num)		((u32)0x1<<pin_num)
+
+//从标准库的32位引脚值获取GPIO引脚数字序号 EX：GPIO_Pin_0－－>0
+#define GET_PIN_num(GPIO_Pin)		Get_num_From_Pin(GPIO_Pin)
+//该宏调用了一个获取2的n次幂的小函数
+
+
 /******************************************************************************/
 /*                                                                            */
 /*                         BKP寄存器                                          */
 /*                                                                            */
 /******************************************************************************/
+#define  bBKP_i									//定位索引
 //前10个寄存器完全可为用户自由使用,地址为:BKP_BASE+0x04至BKP_BASE+0x28,每个寄存器占用4字节空间,即一个字,但只有低16位有效.
 //可直接用下列宏指令对其进行访问， wBKP_DR1等同于BKP->DR1
 #define  wBKP_DR1  			MEM_ADDR(BKP_BASE+0x04)
@@ -572,7 +726,8 @@
 #define  wBKP_DR9  			MEM_ADDR(BKP_BASE+0x24)
 #define  wBKP_DR10  		MEM_ADDR(BKP_BASE+0x28)
 //这些寄存器不会被系统复位，电源复位，待机唤醒所复位
-//注意对后备寄存器的写操作必须使能PWR及BKP的时钟，即bRCC_ENABLE_PWR=1;bRCC_ENABLE_BKP=1; 
+//注意对后备寄存器的写操作必须使能PWR及BKP的时钟，
+//即bRCC_ENABLE_PWR=1;bRCC_ENABLE_BKP=1; 
 //对后备寄存器的读则无须以上三点，随时可读。		
 
 
@@ -602,7 +757,7 @@
 /*                         RTC寄存器                                          */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bRTC_i									//定位索引
 /****************** RTC_CRH 控制寄存器高位 ******************/
 #define  bRTC_CR_SECIE        BIT_ADDR(RTC_BASE+0x00, 0) //SECIE允许秒中断位，定义：0（屏蔽中断），1（允许中断）
 #define  bRTC_CR_ALRIE        BIT_ADDR(RTC_BASE+0x00, 1)  //ALRIE允许闹钟中断位，定义：0（屏蔽中断），1（允许中断）
@@ -675,14 +830,14 @@
 /*         USART寄存器                                   											*/
 /*                                                                            */
 /******************************************************************************/
-
+#define  bURT_i									//定位索引
 /****************** USART_SR 状态寄存器 ******************/
 #define  bURT_SR_PE(USARTx_BASE) 			BIT_ADDR(USARTx_BASE+0x00, 0) //校验错误（Parity Error）在接收模式下，如果出现奇偶校验错误，硬件对该位置位。
 #define  bURT_SR_FE(USARTx_BASE) 			BIT_ADDR(USARTx_BASE+0x00, 1) //帧错误（Framing Error）当检测到同步错位，过多的噪声或者检测到断开符，该位被硬件置位。
 #define  bURT_SR_NE(USARTx_BASE) 			BIT_ADDR(USARTx_BASE+0x00, 2) //噪声错误（Noise Error）在接收到的帧检测到噪音时，由硬件对该位置位。
 #define  bURT_SR_ORE(USARTx_BASE) 		BIT_ADDR(USARTx_BASE+0x00, 3) //过载错误（Overrun Error）当RXNE仍然是’1’的时候，当前被接收在移位寄存器中的数据，需要传送至RDR寄存器时，硬件将该位置位。如果USART_CR1中的RXNEIE为’1’的话，则产生中断。
 #define  bURT_SR_IDLE(USARTx_BASE)		BIT_ADDR(USARTx_BASE+0x00, 4) //IDLE：监测到总线空闲；当检测到总线空闲时，该位被硬件置位。如果USART_CR1中的IDLEIE为’1’，则产生中断。
-#define  bURT_SR_RXNE(USARTx_BASE)		BIT_ADDR(USARTx_BASE+0x00, 5) //接收据寄存器非空（Receive Not Empty），当该位被置位的时候，就是提示已经有数据被接收到了，并且可以读出来了。通过读USART_DR可以将该位清零，也可以向该位写0，直接清除。
+#define  bURT_SR_RXNE(USARTx_BASE)		BIT_ADDR(USARTx_BASE+0x00, 5) //接收数据寄存器非空（Receive Not Empty），当该位被置位的时候，就是提示已经有数据被接收到了，并且可以读出来了。通过读USART_DR可以将该位清零，也可以向该位写0，直接清除。
 #define  bURT_SR_TC(USARTx_BASE) 			BIT_ADDR(USARTx_BASE+0x00, 6) //发送完成（Transmit Complete），当该位被置位的时候，表示USART_DR内的数据已经被发送完成了。如果设置了这个位的中断，则会产生中断。该位也有两种清零方式：1）读USART_SR，写USART_DR。2）直接向该位写0。
 #define  bURT_SR_TXE(USARTx_BASE) 		BIT_ADDR(USARTx_BASE+0x00, 7) //发送数据寄存器空（Transmit Empty）当TDR寄存器中的数据被硬件转移到移位寄存器的时候，该位被硬件置位。如果USART_CR1寄存器中的TXEIE为1，则产生中断。对USART_DR的写操作，将该位清零。
 #define  bURT_SR_LBD(USARTx_BASE) 		BIT_ADDR(USARTx_BASE+0x00, 8) //LIN断开检测（LIN Break Detect）当探测到LIN断开时，该位由硬件置’1’，由软件清’0’(向该位写0)。如果USART_CR3中的LBDIE = 1，则产生中断。
@@ -742,10 +897,10 @@
 
 /******************************************************************************/
 /*                                                                            */
-/*                        SPI接口寄存器                         */
+/*                        SPI接口寄存器                         							*/
 /*                                                                            */
 /******************************************************************************/
-
+#define  bSPI_i									//定位索引
 /*******************    SPI_CR1 寄存器  ********************/
 #define  bSPI_CR_CPHA(SPIx_BASE)     BIT_ADDR(SPIx_BASE+0x00, 0)  /*!< Clock Phase */
 #define  bSPI_CR_CPOL(SPIx_BASE)     BIT_ADDR(SPIx_BASE+0x00, 1)            /*!< Clock Polarity */
@@ -754,7 +909,7 @@
 #define  SET_SPI_CR_BR(SPIx_BASE,a)   	SET_REG_BITn(SPIx_BASE,3,MASKb3,a)
 //取值定义如下： SPI总线速度设置
 #define SPI_SPEED_2   	0    //SPI_SPEED_2   2分频   (SPI 36M@sys 72M) 
-#define SPI_SPEED_4   	1    //SPI_SPEED_2   4分频   (SPI 18M@sys 72M)
+#define SPI_SPEED_4   	1    //SPI_SPEED_4   4分频   (SPI 18M@sys 72M)
 #define SPI_SPEED_8   	2    //SPI_SPEED_8   8分频   (SPI 9M@sys 72M)
 #define SPI_SPEED_16  	3    //SPI_SPEED_16  16分频  (SPI 4.5M@sys 72M)
 #define SPI_SPEED_32  	4    //SPI_SPEED_32  32分频  (SPI 2.25M@sys 72M)
@@ -875,10 +1030,10 @@
 
 /******************************************************************************/
 /*                                                                            */
-/*                        TIM定时器接口寄存器                                  */
+/*                        TIM定时器接口寄存器                                 */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bTIM_i									//定位索引
 /*******************  TIM_CR1 控制寄存器  ********************/
 #define   bTIM_CR_CEN(TIMx_BASE)                         BIT_ADDR(TIMx_BASE,0)            /*!< 使能计数器,定义：0（禁止计数器），1（使能计数器） */
 #define   bTIM_CR_UDIS(TIMx_BASE)                        BIT_ADDR(TIMx_BASE,1)            /*!< 禁止更新，软件通过该位允许/禁止UEV事件的产生 */
@@ -931,36 +1086,65 @@
 //7位：TI1S-TI1选择，定义：0（TIMx_CH1引脚连到TI1输入），1（TIMx_CH1、TIMx_CH2和TIMx_CH3引脚经异或后连到TI1输入）															
 
 
-/*******************  TIM_SMCR 寄存器  *******************/
+/*******************  TIM_SMCR 从模式控制寄存器  *******************/
 #define  SET_TIM_SMCR_SMS(TIMx_BASE,a)   	SET_REG_BITn(TIMx_BASE+0x08,0,MASKb3,a)/*!< SMS[2:0] bits (Slave mode selection) */
+//2-0位：SMS[2:0]从模式选择，当选择了外部信号，触发信号(TRGI)的有效边沿与选中的外部输入极性相关，定义															
+//       000：关闭从模式 – 如果CEN=1，则预分频器直接由内部时钟驱动。001：编码器模式1 – 根据TI1FP1的电平，计数器在TI2FP2的边沿向上/下计数。															
+//       010：编码器模式2 – 根据TI2FP2的电平，计数器在TI1FP1的边沿向上/下计数。															
+//       011：编码器模式3-根据另一个信号的输入电平，计数器在TI1FP1和TI2FP2的边沿向上/下计数。															
+//       100：复位模式 – 选中的触发输入(TRGI)的上升沿重新初始化计数器，并且产生一个更新寄存器的信号。															
+//       101：门控模式 – 当触发输入(TRGI)为高时，计数器的时钟开启。一旦触发输入变为低，则计数器停止(但不复位)。计数器的启动和停止都是受控的。															
+//       110：触发模式 – 计数器在触发输入TRGI的上升沿启动(但不复位)，只有计数器的启动是受控的。															
+//       111：外部时钟模式1 – 选中的触发输入(TRGI)的上升沿驱动计数器。															
+//注：如果TI1F_EN被选为触发输入(TS=100)时，不要使用门控模式。这是因为，TI1F_ED在每次TI1F变化时输出一个脉冲，然而门控模式是要检查触发输入的电平。	
 
 #define  SET_TIM_SMCR_TS(TIMx_BASE,a)   	SET_REG_BITn(TIMx_BASE+0x08,4,MASKb3,a) /*!< TS[2:0] bits (Trigger selection) */
+//6-4位：TS[2:0]触发选择，这3位选择用于同步计数器的触发输入，定义：000（内部触发0(ITR0)，001（内部触发1(ITR1)，010（内部触发2(ITR2)，															
+//      011(内部触发3(ITR3),100(TI1的边沿检测器(TI1F_ED),101(滤波后的定时器输入1(TI1FP1),110(滤波后的定时器输入2(TI2FP2),111(外部触发输入(ETRF)
 
 #define   bTIM_SMCR_MSM(TIMx_BASE)        BIT_ADDR(TIMx_BASE+0x08,7)            /*!< Master/slave mode */
+//7位：MSM主/从模式，定义：0（无作用），1：触发输入(TRGI)上的事件被延迟了，以允许在当前定时器(通过TRGO)与它的从定时器间的完美同步。															
+//                       这对要求把几个定时器同步到一个单一的外部事件时是非常有用的	
 
 #define  SET_TIM_SMCR_ETF(TIMx_BASE,a)   	SET_REG_BITn(TIMx_BASE+0x08,8,MASKb4,a)	/*!< ETF[3:0] bits (External trigger filter) */
+//11-8位：ETF外部触发滤波，这些位定义了对ETRP信号采样的频率和对ETRP数字滤波的带宽。实际上，数字滤波器是一个事件计数器，它记录到N个事件后															
+//        会产生一个输出的跳变，定义：0000（无滤波器，以fDTS采样）0001（采样频率fSAMPLING=fCK_INT，N=2）0010（采样频率fSAMPLING=fCK_INT，N=4）															
+//        0011（采样频率fSAMPLING=fCK_INT，N=8）0100（采样频率fSAMPLING=fDTS/2，N=6）0101（采样频率fSAMPLING=fDTS/2，N=8）															
+//        0110（采样频率fSAMPLING=fDTS/4，N=6）0111（采样频率fSAMPLING=fDTS/4，N=8）1000（采样频率fSAMPLING=fDTS/8，N=6）															
+//        1001（采样频率fSAMPLING=fDTS/8，N=8）1010（采样频率fSAMPLING=fDTS/16，N=5）1011：采样频率fSAMPLING=fDTS/16，N=6															
+//        1100（采样频率fSAMPLING=fDTS/16，N=8）1101（采样频率fSAMPLING=fDTS/32，N=5）1110（采样频率fSAMPLING=fDTS/32，N=6）															
+//        1111（采样频率fSAMPLING=fDTS/32，N=8）		
 
 #define  SET_TIM_SMCR_ETPS(TIMx_BASE,a)   SET_REG_BITn(TIMx_BASE+0x08,12,MASKb2,a)	  /*!< ETPS[1:0] bits (External trigger prescaler) */
+//ETPS[1:0]：外部触发预分频，外部触发信号ETRP的频率必须最多是TIMxCLK频率的1/4。当输入较快的外部时钟时，可以使用预分频降低ETRP的频率															
+//                 定义：00（关闭预分频），01（ETRP/2),10(ETRP/4),11(ETRP/8)				
 
 #define   bTIM_SMCR_ECE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x08,14)            /*!< External clock enable */
-#define   bTIM_SMCR_ETP(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x08,15)            /*!< External trigger polarity */
+//ECE外部时钟使能位，定义：0（禁止外部时钟模式2），1（使能外部时钟模式2，计数器由ETRF信号上的任意有效边沿驱动）															
+//      注1：设置ECE位与选择外部时钟模式1并将TRGI连到ETRF(SMS=111和TS=111)具有相同功效															
+//      注2：下述从模式可以与外部时钟模式2同时使用：复位模式，门控模式和触发模式；但是，这时TRGI不能连到ETRF(TS位不能是’111’)。															
+//      注3：外部时钟模式1和外部时钟模式2同时被使能时，外部时钟的输入是ETRF		
+#define   bTIM_SMCR_ETP(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x08,15)           
+/*!< ETP外部触发极性，定义：0（ETR不反相，高电平或上升沿有效），1（ETR被反相，低电平或下降沿有效） */
 
-/*******************  TIM_DIER 寄存器  *******************/
-#define   bTIM_DIER_UIE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,0)            /*!< Update interrupt enable */
-#define   bTIM_DIER_CC1IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,1)            /*!< Capture/Compare 1 interrupt enable */
-#define   bTIM_DIER_CC2IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,2)            /*!< Capture/Compare 2 interrupt enable */
-#define   bTIM_DIER_CC3IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,3)            /*!< Capture/Compare 3 interrupt enable */
-#define   bTIM_DIER_CC4IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,4)            /*!< Capture/Compare 4 interrupt enable */
-#define   bTIM_DIER_COMIE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,5)            /*!< COM interrupt enable */
-#define   bTIM_DIER_TIE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,6)            /*!< Trigger interrupt enable */
-#define   bTIM_DIER_BIE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,7)            /*!< Break interrupt enable */
-#define   bTIM_DIER_UDE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,8)            /*!< Update DMA request enable */
-#define   bTIM_DIER_CC1DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,9)            /*!< Capture/Compare 1 DMA request enable */
-#define   bTIM_DIER_CC2DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,10)            /*!< Capture/Compare 2 DMA request enable */
-#define   bTIM_DIER_CC3DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,11)            /*!< Capture/Compare 3 DMA request enable */
-#define   bTIM_DIER_CC4DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,12)            /*!< Capture/Compare 4 DMA request enable */
-#define   bTIM_DIER_COMDE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,13)            /*!< COM DMA request enable */
-#define   bTIM_DIER_TDE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,14)            /*!< Trigger DMA request enable */
+
+/*******************  TIM_DIER 		DMA/中断使能寄存器  *******************/
+#define   bTIM_DIER_UIE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,0)            /*!< UIE 允许更新中断，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC1IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,1)            /*!< CC1IE 允许捕获/比较1中断，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC2IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,2)            /*!< CC2IE 允许捕获/比较2中断，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC3IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,3)            /*!< CC3IE 允许捕获/比较3中断，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC4IE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,4)            /*!< CC4IE 允许捕获/比较4中断，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_COMIE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,5)            /*!< COMIE 允许COM中断，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_TIE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,6)            /*!< TIE：触发中断使能，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_BIE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,7)            /*!< BIE: 允许刹车中断，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_UDE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,8)            /*!< UDE: 允许更新的DMA请求，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC1DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,9)            /*!< CC1DE，允许捕获/比较1的DMA请求，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC2DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,10)            /*!< CC2DE，允许捕获/比较2的DMA请求，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC3DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,11)            /*!< CC3DE，允许捕获/比较3的DMA请求，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_CC4DE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,12)            /*!< CC4DE，允许捕获/比较4的DMA请求，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_COMDE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x0C,13)            /*!< COMDE：允许COM的DMA请求，定义：0（禁止），1（允许） */
+#define   bTIM_DIER_TDE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x0C,14)            /*!< TDE：允许触发DMA请求，定义：0（禁止），1（允许） */
+
 
 /********************  TIM_SR 状态寄存器  ********************/
 #define   bTIM_SR_UIF(TIMx_BASE)                          BIT_ADDR(TIMx_BASE +0x10,0)            /*!< 更新中断标记（硬件置1，软件清0）定义：0（无更新事件）1（更新中断等待响应。当寄存器被更新时该位由硬件置’1’） */
@@ -975,8 +1159,24 @@
 #define   bTIM_SR_CC2OF(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x10,10)            /*!< Capture/Compare 2 Overcapture Flag */
 #define   bTIM_SR_CC3OF(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x10,11)            /*!< Capture/Compare 3 Overcapture Flag */
 #define   bTIM_SR_CC4OF(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x10,12)            /*!< Capture/Compare 4 Overcapture Flag */
+//12,11,10,9位：CC（4-1）OF捕获/比较（4-1）重复捕获标记，仅当相应的通道被配置为输入捕获时，该标记可由硬件置1。写0可清除该位，															
+//              定义：0（无重复捕获），1（计数器的值被捕获到TIMx_CCR1寄存器时，CC1IF的状态已经为’1）															
+//7位：BIF刹车中断标记，一旦刹车输入有效，由硬件对该位置’1’如果刹车输入无效,则该位可由软件清’0’.定义:0（无刹车事件），1（刹车检测到有效电平															
+//6位：TIF：触发器中断标记，当发生触发事件(当从模式控制器处于除门控模式外的其它模式时，在TRGI输入端检测到有效边沿，或门控模式下的任一边沿)															
+//          时由硬件对该位置’1’。它由软件清’0’。定义：0（无触发事件），1（触发中断等待响应）															
+//5位：COMIFCOM中断标记，一旦产生COM事件(当捕获/比较控制位：CCxE、CCxNE、OCxM已被更新)该位由硬件置’1’。它由软件清’0’。定义：0(无事件),1(有)															
+//4,3,2,1位：CC（4-1）IF捕获/比较（4-1）中断标记，如果通道CC1配置为输出模式，当计数器值与比较值匹配时该位由硬件置1，但在中心对称模式下除外。															
+//           (参考TIMx_CR1寄存器的CMS位)。它由软件清’0’。定义：0（无匹配发生），1（TIMx_CNT的值与TIMx_CCR1的值匹配）															
+//           当TIMx_CCR1的内容大于TIMx_APR的内容时，在向上或向上/下计数模式时计数器溢出，或向下计数模式时的计数器下溢条件下，CC1IF位变高															
+//           如果通道CC1配置为输入模式，当捕获事件发生时该位由硬件置’1’，它由软件清’0’或通过读TIMx_CCR1清’0’。															
+//          定义：0（无输入捕获产生），1（计数器值已被捕获(拷贝)至TIMx_CCR1(在IC1上检测到与所选极性相同的边沿)）															
+//0位：UIF：更新中断标记，当产生更新事件时该位由硬件置’1’。它由软件清’0’定义：0（无更新事件产生），1（更新中断等待响应。当寄存器被更新时该位由硬件置’1’）															
+//          若TIMx_CR1寄存器的UDIS=0，当重复计数器数值上溢或下溢时(重复计数器=0时产生更新事件)。															
+//          若TIMx_CR1寄存器的URS=0、UDIS=0，当设置TIMx_EGR寄存器的UG=1时产生更新事件，通过软件对计数器CNT重新初始化时															
+//          若TIMx_CR1寄存器的URS=0、UDIS=0，当计数器CNT被触发事件重新初始化时。(参考13.4.3: TIM1和TIM8从模式控制寄存器(TIMx_SMCR))															
 
-/*******************  TIM_EGR 寄存器  ********************/
+
+/*******************  TIM_EGR 事件产生寄存器  ********************/
 #define   bTIM_EGR_UG(TIMx_BASE)                          BIT_ADDR(TIMx_BASE +0x14,0)               /*!< Update Generation */
 #define   bTIM_EGR_CC1G(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x14,1)               /*!< Capture/Compare 1 Generation */
 #define   bTIM_EGR_CC2G(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x14,2)               /*!< Capture/Compare 2 Generation */
@@ -985,6 +1185,16 @@
 #define   bTIM_EGR_COMG(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x14,5)               /*!< Capture/Compare Control Update Generation */
 #define   bTIM_EGR_TG(TIMx_BASE)                          BIT_ADDR(TIMx_BASE +0x14,6)               /*!< Trigger Generation */
 #define   bTIM_EGR_BG(TIMx_BASE)                          BIT_ADDR(TIMx_BASE +0x14,7)               /*!< Break Generation */
+//7位：BG产生刹车事件（软件置1，硬件清0），定义：0（无动作），1（产生一个刹车事件。此时MOE=0、BIF=1，若开启对应的中断和DMA，则产生相应的中断和DMA）															
+//6位：TG产生触发事件（软件置1，硬件清0），定义：0（无动作），1（TIMx_SR寄存器的TIF=1，若开启对应的中断和DMA，则产生相应的中断和DMA）															
+//5位：COMG捕获/比较事件,产生控制更新(软件置1，硬件清0),定义：0(无动作)，1(当CCPC=1,允许更新CCxE、CCxNE、OCxM位)注：该位只对拥有互补输出的通道有效															
+//4,3,2,1位：CC(4-1)G：产生捕获/比较(4-1)事件(软件置1，硬件清0），定义：0（无动作），1（在通道CC1上产生一个捕获/比较事件）															
+//           若通道CC1配置为输出，设置CC1IF=1，若开启对应的中断和DMA，则产生相应的中断和DMA															
+//           若通道CC1配置为输入，当前的计数器值被捕获至TIMx_CCR1寄存器；设置CC1IF=1，若开启对应的中断和DMA，则产生相应的中断和DMA。若CC1IF已经为1，则设置CC1OF=1															
+//           则设置CC1OF=1															
+//0位：UG产生更新事件（软件置1，硬件清0），定义：0（无动作），1（重新初始化计数器，并产生一个更新事件。注意预分频器的计数器也被清’0’															
+//     (但是预分频系数不变)。若在中心对称模式下或DIR=0(向上计数)则计数器被清’0’；若DIR=1(向下计数)则计数器取TIMx_ARR的值）															
+
 
 /******************  TIM_CCMR1 寄存器  *******************/
 #define   bTIM_CCMR_CC1S(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x18,0)            /*!< CC1S[1:0] bits (Capture/Compare 1 Selection) */
@@ -996,7 +1206,7 @@
 
 #define  SET_TIM_CCMR_OC1M(TIMx_BASE,a)   	SET_REG_BITn(TIMx_BASE+0x18,4,MASKb3,a)  /*!< OC1M[2:0] bits (Output Compare 1 Mode) */
 
-#define   bTIM_CCMR_OC1CE(TIMx_BASE)                     BIT_ADDR(TIMx_BASE +0x18,7)            /*!< Output Compare 1Clear Enable */
+#define   bTIM_CCMR_OC1CE(TIMx_BASE)                     BIT_ADDR(TIMx_BASE +0x18,7)            /*!< Output Compare 1 Clear Enable */
 
 #define   bTIM_CCMR_CC2S(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x18,8)            /*!< CC2S[1:0] bits (Capture/Compare 2 Selection) */
 #define   bTIM_CCMR_CC2S_0(TIMx_BASE)                    BIT_ADDR(TIMx_BASE +0x18,8)            /*!< Bit 0 */
@@ -1061,70 +1271,45 @@
 #define   bTIM_CCMR_IC4PSC_1(TIMx_BASE)                  BIT_ADDR(TIMx_BASE +0x1C,11)            /*!< Bit 1 */
 
 #define  	SET_TIM_CCMR_IC4F(TIMx_BASE,a)   	SET_REG_BITn(TIMx_BASE+0x1C,12,MASKb4,a)    /*!< IC4F[3:0] bits (Input Capture 4 Filter) */
+//IC1PSC/IC2PSC/IC3PSC/IC4PSC:(2BIT)
+//输入/捕获x预分频器，这2位定义了CC1输入(IC1)的预分频系数，一旦CC1E=0(TIMx_CCER寄存器中)，则预分频器复位。															
+//       00（无预分频器，捕获输入口上检测到的每一个边沿都触发一次捕获),01(每2个事件触发一次捕获),10(每4个事件触发一次捕获),11(每8个事件触发一次捕获)	
+//IC1F/IC2F/IC3F/IC4F:(4BIT)
+//输入捕获1滤波器,这几位定义了TI1输入的采样频率及数字滤波器长度,数字滤波器由一个事件计数器组成,记录到N个事件后会产生一个输出的跳变															
+//    定义：0000(无滤波器，以fDTS采样）0010（采样频率fSAMPLING=fCK_INT，N=4）0011（采样频率fSAMPLING=fCK_INT，N=8）0100（fSAMPLING=fDTS/2，N=6）															
+//          0101（fSAMPLING=fDTS/2，N=8），0110（fSAMPLING=fDTS/4，N=6），0111（fSAMPLING=fDTS/4，N=8），1000（fSAMPLING=fDTS/8，N=6）															
+//          1001（fSAMPLING=fDTS/8，N=8），1010（fSAMPLING=fDTS/16，N=5），1011（fSAMPLING=fDTS/16，N=6），1100（fSAMPLING=fDTS/16，N=8）															
+//          1101（fSAMPLING=fDTS/32，N=5），0110（fSAMPLING=fDTS/4，N=6），1110（fSAMPLING=fDTS/32，N=6），0111（fSAMPLING=fDTS/4，N=8）															
+//          1111（fSAMPLING=fDTS/32，N=8）	
 
-//输出比较和输入捕获功能不同，在寄存器中的设置也不同。															
-//输出比较模式															
-//15位：OC2CE：输出比较2清0使能															
-//14-12位：OC2M[2:0]：输出比较2模式															
-//11位：OC2PE：输出比较2预装载使能															
-//10位：OC2FE：输出比较2快速使能															
-//9-8位：CC2S[1:0]：捕获/比较2选择,该位定义通道的方向(输入/输出),及输入脚的选择,定义：00(CC2通道被配置为输出) 01(CC2通道被配置为输入,IC2映射在TI2上)															
-//       10(CC2通道被配置为输入，IC2映射在TI1上) 11(CC2通道被配置为输入，IC2映射在TRC上。此模式仅工作在内部触发器输入被选中时。															
-//       (由TIMx_SMCR寄存器的TS位选择),注：CC2S仅在通道关闭时(TIMx_CCER寄存器的CC2E=0)才是可写的。															
-//9-8位：CC4S[1:0]：捕获/比较4选择;该位定义通道的方向(输入/输出);及输入脚的选择,定义:00(CC4通道被配置为输出)01(CC4通道被配置为输入,IC4映射在TI4上)															
-//       10(CC4通道被配置为输入，IC4映射在TI3上) 11(CC4通道被配置为输入，IC4映射在TRC上。此模式仅工作在内部触发器输入被选中时。															
-//       (由TIMx_SMCR寄存器的TS位选择),注：CC4S仅在通道关闭时(TIMx_CCER寄存器的CC4E=0)才是可写的。															
-//7位：OC1CE：输出比较1清’0’使能，定义：0（OC1REF 不受ETRF输入的影响），1（一旦检测到ETRF输入高电平，清除OC1REF=0）															
-//6-4位：OC1M[2:0]输出比较1模式，该3位定义了输出参考信号OC1REF的动作，而OC1REF决定了OC1、OC1N的值。OC1REF是高电平有效，而OC1、OC1N															
-//       的有效电平取决于CC1P、CC1NP位，定义：000（冻结。输出比较寄存器TIMx_CCR1与计数器TIMx_CNT间的比较对OC1REF不起作用)															
-//       001(匹配时设置通道1为有效电平。当计数器TIMx_CNT的值与捕获/比较寄存器1 (TIMx_CCR1)相同时，强制OC1REF为高),010(强制OC1REF为低）															
-//       011（翻转。当TIMx_CCR1=TIMx_CNT时，翻转OC1REF的电平）100（强制为无效电平。强制OC1REF为低）101（强制OC1REF为高）															
+
+
+//CC1S/CC2S/CC3S/CC4S:(2BIT)
+//捕获/比较1 选择,这2位定义通道的方向(输入/输出),及输入脚的选择,定义:00(CC1通道被配置为输出),01(CC1通道被配置为输入,IC1映射在TI1上)															
+//   10(CC1通道被配置为输入,IC1映射在TI2上),11(CC1通道被配置为输入,IC1映射在TRC上.此模式仅工作在内部触发器输入被选中时(由TIMx_SMCR寄存器的TS位选择)															
+//     注：CC1S仅在通道关闭时(TIMx_CCER寄存器的CC1E=0)才是可写的。
+
+//OC1FE/OC2FE/OC3FE/OC4FE:(1BIT)输出比较x快速使能
+
+//OC1PE/OC2PE/OC3PE/OC4PE:(1BIT)输出比较x预装载使能
+
+//OC1M/OC2M/OC3M/OC4M:(3BIT)
+//输出比较x 模式，该3位定义了输出参考信号OC1REF的动作，而OC1REF决定了OC1、OC1N的值。OC1REF是高电平有效，而OC1、OC1N															
+//       的有效电平取决于CC1P、CC1NP位，定义：
+//			 000:（冻结。输出比较寄存器TIMx_CCR1与计数器TIMx_CNT间的比较对OC1REF不起作用)															
+//       001:(匹配时设置通道1为有效电平。当计数器TIMx_CNT的值与捕获/比较寄存器1 (TIMx_CCR1)相同时，强制OC1REF为高),010(强制OC1REF为低）															
+//       011:（翻转。当TIMx_CCR1=TIMx_CNT时，翻转OC1REF的电平）100（强制为无效电平。强制OC1REF为低）101（强制OC1REF为高）															
 //       110：PWM模式1－ 在向上计数时，一旦TIMx_CNT<TIMx_CCR1时通道1为有效电平，否则为无效电平；在向下计数时，一旦TIMx_CNT>TIMx_CCR1时通道1															
 //            为无效电平(OC1REF=0)，否则为有效电平(OC1REF=1)。															
 //       111：PWM模式2－ 在向上计数时，一旦TIMx_CNT<TIMx_CCR1时通道1为无效电平，否则为有效电平；在向下计数时，一旦TIMx_CNT>TIMx_CCR1时通道1															
 //            为有效电平，否则为无效电平。															
 //       注1：一旦LOCK级别设为3(TIMx_BDTR寄存器中的LOCK位)并且CC1S=00(该通道配置成输出)则该位不能被修改。															
-//       注2：在PWM模式1或PWM模式2中，只有当比较结果改变了或在输出比较模式中从冻结模式切换到PWM模式时，OC1REF电平才改变。															
-//3位：OC1PE输出比较1预装载使能，定义：0（禁止TIMx_CCR1寄存器的预装载功能，可随时写入TIMx_CCR1寄存器，并且新写入的数值立即起作用）															
-//     1（开启TIMx_CCR1寄存器的预装载功能，读写操作仅对预装载寄存器操作，TIMx_CCR1的预装载值在更新事件到来时被加载至当前寄存器中）															
-//     注1：一旦LOCK级别设为3(TIMx_BDTR寄存器中的LOCK位)并且CC1S=00(该通道配置成输出)则该位不能被修改。															
-//     注2：仅在单脉冲模式下(TIMx_CR1寄存器的OPM=1)，可以在未确认预装载寄存器情况下使用PWM模式，否则其动作不确定															
-//2位：OC1FE输出比较1 快速使能，该位用于加快CC输出对触发输入事件的响应，定义：															
-//     0（根据计数器与CCR1的值，CC1正常操作，即使触发器是打开的。当触发器的输入有一个有效沿时，激活CC1输出的最小延时为5个时钟周期）															
-//     1（输入到触发器的有效沿的作用就象发生了一次比较匹配。因此，OC被设置为比较电平而与比较结果无关。采样触发器的有效沿和CC1输出间的延时被缩短为															
-//       3个时钟周期）OCFE只在通道被配置成PWM1或PWM2模式时起作用。															
-//1-0位：CC1S[1:0]捕获/比较1 选择,这2位定义通道的方向(输入/输出),及输入脚的选择,定义:00(CC1通道被配置为输出),01(CC1通道被配置为输入,IC1映射在TI1上)															
-//   10(CC1通道被配置为输入,IC1映射在TI2上),11(CC1通道被配置为输入,IC1映射在TRC上.此模式仅工作在内部触发器输入被选中时(由TIMx_SMCR寄存器的TS位选择)															
-//     注：CC1S仅在通道关闭时(TIMx_CCER寄存器的CC1E=0)才是可写的。															
-//1-0位：CC3S[1:0]捕获/比较3 选择,这2位定义通道的方向(输入/输出),及输入脚的选择,定义:00(CC3通道被配置为输出),01(CC3通道被配置为输入,IC3映射在TI3上)															
-//   10(CC3通道被配置为输入,IC3映射在TI4上),11(CC3通道被配置为输入,IC3映射在TRC上.此模式仅工作在内部触发器输入被选中时(由TIMx_SMCR寄存器的TS位选择)															
-//     注：CC3S仅在通道关闭时(TIMx_CCER寄存器的CC3E=0)才是可写的。															
-//输入捕获模式															
-//15-12位：输入捕获2滤波器															
-//11-10位：CC2S[1:0]输入/捕获2预分频器															
-//9-8位：CC2S[1:0]捕获/比较2选择，这2位定义通道的方向(输入/输出)，及输入脚的选择，定义：00（CC2通道被配置为输出）01（CC2通道被配置为输入，															
-//       IC2映射在TI2上）,10（CC2通道被配置为输入，IC2映射在TI1上）,11(CC2通道被配置为输入，IC2映射在TRC上),此模式仅工作在内部触发器输入被选中时															
-//       (由TIMx_SMCR寄存器的TS位选择),注：CC2S仅在通道关闭时(TIMx_CCER寄存器的CC2E=0)才是可写的。															
-//9-8位：CC4S[1:0]捕获/比较4选择，这2位定义通道的方向(输入/输出)，及输入脚的选择，定义：00（CC4通道被配置为输出）01（CC4通道被配置为输入，															
-//       IC4映射在TI4上）,10（CC4通道被配置为输入，IC4映射在TI3上）,11(CC4通道被配置为输入，IC4映射在TRC上),此模式仅工作在内部触发器输入被选中时															
-//       (由TIMx_SMCR寄存器的TS位选择),注：CC2S仅在通道关闭时(TIMx_CCER寄存器的CC4E=0)才是可写的。															
-//7-4位：IC1F[3:0]:输入捕获1滤波器,这几位定义了TI1输入的采样频率及数字滤波器长度,数字滤波器由一个事件计数器组成,记录到N个事件后会产生一个输出的跳变															
-//    定义：0000(无滤波器，以fDTS采样）0010（采样频率fSAMPLING=fCK_INT，N=4）0011（采样频率fSAMPLING=fCK_INT，N=8）0100（fSAMPLING=fDTS/2，N=6）															
-//          0101（fSAMPLING=fDTS/2，N=8），0110（fSAMPLING=fDTS/4，N=6），0111（fSAMPLING=fDTS/4，N=8），1000（fSAMPLING=fDTS/8，N=6）															
-//          1001（fSAMPLING=fDTS/8，N=8），1010（fSAMPLING=fDTS/16，N=5），1011（fSAMPLING=fDTS/16，N=6），1100（fSAMPLING=fDTS/16，N=8）															
-//          1101（fSAMPLING=fDTS/32，N=5），0110（fSAMPLING=fDTS/4，N=6），1110（fSAMPLING=fDTS/32，N=6），0111（fSAMPLING=fDTS/4，N=8）															
-//          1111（fSAMPLING=fDTS/32，N=8）															
-//3-2位：IC1PSC[1:0]输入/捕获1预分频器，这2位定义了CC1输入(IC1)的预分频系数，一旦CC1E=0(TIMx_CCER寄存器中)，则预分频器复位。															
-//       00（无预分频器，捕获输入口上检测到的每一个边沿都触发一次捕获),01(每2个事件触发一次捕获),10(每4个事件触发一次捕获),11(每8个事件触发一次捕获)															
-//1-0位：CC1S[1:0]捕获/比较1选择,这2位定义通道的方向(输入/输出),及输入脚的选择,定义:00(CC1通道被配置为输出)，01(CC1通道被配置为输入，IC1映射在TI1上       															
-//       10（CC1通道被配置为输入，IC1映射在TI2上）,11：CC1通道被配置为输入，IC1映射在TRC上。此模式仅工作在内部触发器输入被选中时															
-//       (由TIMx_SMCR寄存器的TS位选择)。注：CC1S仅在通道关闭时(TIMx_CCER寄存器的CC1E=0)才是可写的。															
-//1-0位：CC3S[1:0]捕获/比较3选择,这2位定义通道的方向(输入/输出),及输入脚的选择,定义:00(CC3通道被配置为输出)，01(CC3通道被配置为输入，IC3映射在TI3上       															
-//       10（CC3通道被配置为输入，IC3映射在TI4上）,11：CC3通道被配置为输入，IC3映射在TRC上。此模式仅工作在内部触发器输入被选中时															
-//       (由TIMx_SMCR寄存器的TS位选择)。注：CC3S仅在通道关闭时(TIMx_CCER寄存器的CC3E=0)才是可写的。	
+//       注2：在PWM模式1或PWM模式2中，只有当比较结果改变了或在输出比较模式中从冻结模式切换到PWM模式时，OC1REF电平才改变。	
+
+//OC1CE/OC2CE/OC3CE/OC4CE:(1BIT)输出比较x 清0使能
 
 
-/*******************    TIM_CCER 寄存器  *******************/
+/*******************    TIM_CCER 捕获/比较使能寄存器  *******************/
 #define   bTIM_CCER_CC1E(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x20,0)            /*!< Capture/Compare 1 output enable */
 #define   bTIM_CCER_CC1P(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x20,1)            /*!< Capture/Compare 1 output Polarity */
 #define   bTIM_CCER_CC1NE(TIMx_BASE)                      BIT_ADDR(TIMx_BASE +0x20,2)            /*!< Capture/Compare 1 Complementary output enable */
@@ -1153,21 +1338,21 @@
 //                       CC1通道配置为输入，该位决定了计数器的值是否能捕获入TIMx_CCR1寄存器。0（捕获禁止），1（捕获使能）															
 
 
-/*******************    TIM_CNT 寄存器  ********************/
+/*******************    TIM_CNT 计数器  ********************/
 #define   wTIM_CNT(TIMx_BASE)           (MEM_ADDR(TIMx_BASE+0x24))    /*!0-15位：CNT[15:0]计数器的值	 */             
 
-/*******************    TIM_PSC 寄存器  ********************/
+/*******************    TIM_PSC 预分频寄存器  ********************/
 #define   wTIM_PSC(TIMx_BASE)           (MEM_ADDR(TIMx_BASE+0x28))            /*!< Prescaler Value */
 //0-15位：PSC[15:0]预分频器的值，计数器的时钟频率(CK_CNT)等于fCK_PSC/( PSC[15:0]+1)。															
 //        PSC包含了每次当更新事件产生时，装入当前预分频器寄存器的值；更新事件包括计数器被TIM_EGR的UG位清’0’或被工作在复位模式的从控制器清’0’															
 
 
-/*******************    TIM_ARR 寄存器  ********************/
+/*******************    TIM_ARR 	自动重装载值寄存器  ********************/
 #define   wTIM_ARR(TIMx_BASE)           (MEM_ADDR(TIMx_BASE+0x2C))            /*!< actual auto-reload Value */
 //15-0位：ARR[15:0]自动重装载的值，ARR包含了将要传送至实际的自动重装载寄存器的数值，当自动重装载的值为空时，计数器不工作															
 
 
-/*******************    TIM_RCR 寄存器  ********************/
+/*******************    TIM_RCR 重复计数寄存器  ********************/
 #define   wTIM_RCR(TIMx_BASE)           (MEM_ADDR(TIMx_BASE+0x30))               /*!< Repetition Counter Value */
 //7-0位：开启了预装载功能后，这些位允许用户设置比较寄存器的更新速率(即周期性地从预装载寄存器传输到当前寄存器)；如果允许产生更新中断，则会同时影响产生															
 //       更新中断的速率。每次向下计数器REP_CNT达到0，会产生一个更新事件并且计数器REP_CNT重新从REP值开始计数。由于REP_CNT只有在周期更新事件U_RC															
@@ -1175,16 +1360,16 @@
 //       这意味着在PWM模式中，(REP+1)对应着：－ 在边沿对齐模式下，PWM周期的数目；－ 在中心对称模式下，PWM半周期的数目；															
 
 
-/*******************    TIM_CCR1 寄存器  *******************/
+/*******************    TIM_CCR1 通道1捕获/比较值寄存器  *******************/
 #define   wTIM_CCR1(TIMx_BASE)         (MEM_ADDR(TIMx_BASE+0x34))           /*!< Capture/Compare 1 Value */
 
-/*******************    TIM_CCR2 寄存器  *******************/
+/*******************    TIM_CCR2 通道2捕获/比较值寄存器  *******************/
 #define   wTIM_CCR2(TIMx_BASE)         (MEM_ADDR(TIMx_BASE+0x38))            /*!< Capture/Compare 2 Value */
 
-/*******************    TIM_CCR3 寄存器  *******************/
+/*******************    TIM_CCR3 通道3捕获/比较值寄存器  *******************/
 #define   wTIM_CCR3(TIMx_BASE)         (MEM_ADDR(TIMx_BASE+0x3C))            /*!< Capture/Compare 3 Value */
 
-/*******************    TIM_CCR4 寄存器  *******************/
+/*******************    TIM_CCR4 通道4捕获/比较值寄存器  *******************/
 #define   wTIM_CCR4(TIMx_BASE)         (MEM_ADDR(TIMx_BASE+0x40))            /*!< Capture/Compare 4 Value */
 
 //以上4个CCR寄存器分别为4个通道的捕获/比较值，下面以CCR1为例说明一下：
@@ -1194,46 +1379,52 @@
 //        若CC1通道配置为输入，CCR1包含了由上一次输入捕获1事件(IC1)传输的计数器值。															
 
 
-/*******************    TIM_BDTR 寄存器  *******************/
-/*!< DTG[0:7] bits (Dead-Time Generator set-up) */
+/*******************    TIM_BDTR 刹车和死区寄存器  *******************/
 #define  	SET_TIM_BDTR_DTG(TIMx_BASE,a)   	SET_REG_BITn(TIMx_BASE+0x44,0,MASKb8,a)
-
-#define   bTIM_BDTR_LOCK(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x44,8)            /*!< LOCK[1:0] bits (Lock Configuration) */
-#define   bTIM_BDTR_LOCK_0(TIMx_BASE)                     BIT_ADDR(TIMx_BASE +0x44,8)            /*!< Bit 0 */
-#define   bTIM_BDTR_LOCK_1(TIMx_BASE)                     BIT_ADDR(TIMx_BASE +0x44,9)            /*!< Bit 1 */
-
-#define   bTIM_BDTR_OSSI(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x44,10)            /*!< Off-State Selection for Idle mode */
-#define   bTIM_BDTR_OSSR(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x44,11)            /*!< Off-State Selection for Run mode */
-#define   bTIM_BDTR_BKE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,12)            /*!< Break enable */
-#define   bTIM_BDTR_BKP(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,13)            /*!< Break Polarity */
-#define   bTIM_BDTR_AOE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,14)            /*!< Automatic Output enable */
-#define   bTIM_BDTR_MOE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,15)            /*!< Main Output enable */
-//注释： 根据锁定设置，AOE、BKP、BKE、OSSI、OSSR和DTG[7:0]位均可被写保护，有必要在第一次写入TIMx_BDTR寄存器时对它们进行配置															
-//15位：MOE主输出使能，一旦刹车输入有效，该位被硬件异步清’0’。根据AOE位的设置值，该位可以由软件清’0’或被自动置1。它仅对配置为输出的通道有效。															
-//      定义：0（禁止OC和OCN输出或强制为空闲状态），1（如果设置了相应的使能位(TIMx_CCER寄存器的CCxE、CCxNE位)，则开启OC和OCN输出。）															
-//14位：AOE自动输出使能，定义：0（MOE只能被软件置’1’），1（MOE能被软件置’1’或在下一个更新事件被自动置’1’(如果刹车输入无效)															
-//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为’1’，则该位不能被修改															
-//13位：BKP刹车输入极性，定义：0（刹车输入低电平有效），1（刹车输入高电平有效），注：任何对该位的写操作都需要一个APB时钟的延迟以后才能起作用															
-//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为’1’，则该位不能被修改。															
-//12位：BKE刹车功能使能，定义：0（禁止刹车输入(BRK及CCS时钟失效事件)，1（开启），注：任何对该位的写操作都需要一个APB时钟的延迟以后才能起作用															
-//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为’1’，则该位不能被修改。															
-//11位：OSSR运行模式下“关闭状态”选择，该位用于当MOE=1且通道为互补输出时。没有互补输出的定时器中不存在OSSR位，定义：															
-//      0（当定时器不工作时，禁止OC/OCN输出(OC/OCN使能输出信号=0)）															
-//      1（当定时器不工作时，一旦CCxE=1或CCxNE=1，首先开启OC/OCN并输出无效电平，然后置OC/OCN使能输出信号=1）															
-//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为2，则该位不能被修改。															
-//10位：OSSI空闲模式下“关闭状态”选择，该位用于当MOE=0且通道设为输出时，注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为2，则该位不能被修改。															
-//      定义：0（当定时器不工作时，禁止OC/OCN输出(OC/OCN使能输出信号=0)；															
-//      1（当定时器不工作时，一旦CCxE=1或CCxNE=1，OC/OCN首先输出其空闲电平，然后OC/OCN使能输出信号=1。）															
-//9-8位：LOOK[1:0]锁定设置，该位为防止软件错误而提供写保护，注：在系统复位后，只能写一次LOCK位，一旦写入TIMx_BDTR寄存器，则其内容冻结直至复位。															
-//      定义：00（锁定关闭，寄存器无写保护），01（锁定级别1，不能写入TIMx_BDTR寄存器的DTG、BKE、BKP、AOE位和TIMx_CR2寄存器的OISx/OISxN位）															
-//      10(锁定级别2,不能写入级别1中的各位,也不能写入CC极性位(一旦相关通道通过CCxS位设为输出,CC极性位是TIMx_CCER寄存器的CCxP/CCNxP位)OSSR/OSSI位															
-//      11：锁定级别3,不能写入锁定级别2中的各位,也不能写入CC控制位(一旦相关通道通过CCxS位设为输出,CC控制位是TIMx_CCMRx寄存器的OCxM/OCxPE位)；															
 //7-0位：死区发生器设置,控制死区事件.DTG[7:5]=0xx => DT=DTG[7:0] × Tdtg,Tdtg = TDTS;DTG[7:5]=10x => DT=(64+DTG[5:0]) × Tdtg,Tdtg=2×TDTS；															
 //       DTG[7:5]=110 => DT=(32+DTG[4:0]) × Tdtg，Tdtg = 8 × TDTS；DTG[7:5]=111 => DT=(32+DTG[4:0])× Tdtg，Tdtg = 16 × TDTS；															
 //       注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为1、2或3，则不能修改这些位。设DT表示其持续时间															
 
+#define   bTIM_BDTR_LOCK(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x44,8)            /*!< LOCK[1:0] bits (Lock Configuration) */
+#define   bTIM_BDTR_LOCK_0(TIMx_BASE)                     BIT_ADDR(TIMx_BASE +0x44,8)            /*!< Bit 0 */
+#define   bTIM_BDTR_LOCK_1(TIMx_BASE)                     BIT_ADDR(TIMx_BASE +0x44,9)            /*!< Bit 1 */
+//9-8位：LOOK[1:0]锁定设置，该位为防止软件错误而提供写保护，注：在系统复位后，只能写一次LOCK位，一旦写入TIMx_BDTR寄存器，则其内容冻结直至复位。															
+//      定义：00（锁定关闭，寄存器无写保护），01（锁定级别1，不能写入TIMx_BDTR寄存器的DTG、BKE、BKP、AOE位和TIMx_CR2寄存器的OISx/OISxN位）															
+//      10(锁定级别2,不能写入级别1中的各位,也不能写入CC极性位(一旦相关通道通过CCxS位设为输出,CC极性位是TIMx_CCER寄存器的CCxP/CCNxP位)OSSR/OSSI位															
+//      11：锁定级别3,不能写入锁定级别2中的各位,也不能写入CC控制位(一旦相关通道通过CCxS位设为输出,CC控制位是TIMx_CCMRx寄存器的OCxM/OCxPE位)；
+//注释： 根据锁定设置，AOE、BKP、BKE、OSSI、OSSR和DTG[7:0]位均可被写保护，有必要在第一次写入TIMx_BDTR寄存器时对它们进行配置	
 
-/*******************    TIM_DCR 寄存器  ********************/
+
+#define   bTIM_BDTR_OSSI(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x44,10)            /*!< Off-State Selection for Idle mode */
+//10位：OSSI空闲模式下“关闭状态”选择，该位用于当MOE=0且通道设为输出时，注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为2，则该位不能被修改。															
+//      定义：0（当定时器不工作时，禁止OC/OCN输出(OC/OCN使能输出信号=0)；															
+//      1（当定时器不工作时，一旦CCxE=1或CCxNE=1，OC/OCN首先输出其空闲电平，然后OC/OCN使能输出信号=1。）															
+
+#define   bTIM_BDTR_OSSR(TIMx_BASE)                       BIT_ADDR(TIMx_BASE +0x44,11)            /*!< Off-State Selection for Run mode */
+//11位：OSSR运行模式下“关闭状态”选择，该位用于当MOE=1且通道为互补输出时。没有互补输出的定时器中不存在OSSR位，定义：															
+//      0（当定时器不工作时，禁止OC/OCN输出(OC/OCN使能输出信号=0)）															
+//      1（当定时器不工作时，一旦CCxE=1或CCxNE=1，首先开启OC/OCN并输出无效电平，然后置OC/OCN使能输出信号=1）															
+//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为2，则该位不能被修改。															
+
+#define   bTIM_BDTR_BKE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,12)            /*!< Break enable */
+//12位：BKE刹车功能使能，定义：0（禁止刹车输入(BRK及CCS时钟失效事件)，1（开启），注：任何对该位的写操作都需要一个APB时钟的延迟以后才能起作用															
+//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为’1’，则该位不能被修改。															
+
+#define   bTIM_BDTR_BKP(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,13)            /*!< Break Polarity */
+//13位：BKP刹车输入极性，定义：0（刹车输入低电平有效），1（刹车输入高电平有效），注：任何对该位的写操作都需要一个APB时钟的延迟以后才能起作用															
+//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为’1’，则该位不能被修改。															
+
+#define   bTIM_BDTR_AOE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,14)            /*!< Automatic Output enable */
+//14位：AOE自动输出使能，定义：0（MOE只能被软件置’1’），1（MOE能被软件置’1’或在下一个更新事件被自动置’1’(如果刹车输入无效)															
+//      注：一旦LOCK级别(TIMx_BDTR寄存器中的LOCK位)设为’1’，则该位不能被修改															
+
+
+#define   bTIM_BDTR_MOE(TIMx_BASE)                        BIT_ADDR(TIMx_BASE +0x44,15)            /*!< Main Output enable */
+//15位：MOE主输出使能，一旦刹车输入有效，该位被硬件异步清’0’。根据AOE位的设置值，该位可以由软件清’0’或被自动置1。它仅对配置为输出的通道有效。															
+//      定义：0（禁止OC和OCN输出或强制为空闲状态），1（如果设置了相应的使能位(TIMx_CCER寄存器的CCxE、CCxNE位)，则开启OC和OCN输出。）															
+
+
+/*******************    TIM_DCR 		DMA控制寄存器  ********************/
 /*!< DBA从第0BIT开始共5位： (DMA Base Address) */
 #define  	SET_TIM_DCR_DBA(TIMx_BASE,a)   	SET_REG_BITn(TIMx_BASE+0x48,0,MASKb5,a)
 
@@ -1246,7 +1437,7 @@
 //       00000：TIMx_CR1， 00001：TIMx_CR2， 00010：TIMx_SMCR， ......															
 
 
-/*******************    TIM_DMAR 寄存器  *******************/
+/*******************    TIM_DMAR 连续模式的DMA地址寄存器  *******************/
 #define   bTIM_DMAR_DMAB(TIMx_BASE)       (MEM_ADDR(TIMx_BASE+0x4C))            /*!< DMA 寄存器 for burst accesses */
 //15-0位：DMAB[15:0]DMA连续传送寄存器，对TIMx_DMAR寄存器的读或写会导致对以下地址所在寄存器的存取操作，TIMx_CR1地址 + DBA + DMA索引，其中： 															
 //        "TIMx_CR1地址"是控制寄存器1(TIMx_CR1)所在的地址:"DBA"是TIMx_DCR寄存器中定义的基地址:"DMA索引"是由DMA自动控制的偏移量,															
@@ -1255,10 +1446,10 @@
 
 /******************************************************************************/
 /*                                                                            */
-/*                           独立看门狗寄存器  		                             */
+/*                           独立看门狗寄存器  		                            */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bIWDG_i									//定位索引
 /*******************    IWDG_KR 寄存器  ********************/
        
 #define  wIWDG_KEY					(MEM_ADDR(IWDG_BASE))/*!< Key value (只写, 读出为0000h) */
@@ -1274,10 +1465,10 @@
 #define  bIWDG_SR_RVU							BIT_ADDR(IWDG_BASE +0x0C,1)							 /*!< 看门狗计数器重装载更新 */
 /******************************************************************************/
 /*                                                                            */
-/*                            窗口看门狗寄存器                    			        */
+/*                            窗口看门狗寄存器                    		        */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bWWDG_i									//定位索引
 /*******************    WWDG_CR 寄存器  ********************/
 /*!< T从第0BIT开始共7位：  T[6:0] bits (7-Bit counter (MSB to LSB)) */
 #define  SET_WWDG_CR_T(a)   	SET_REG_BITn(WWDG_BASE,0,MASKb7,a)
@@ -1301,7 +1492,7 @@
 /*                         bxCAN总线控制器                                    */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bCAN_i									//定位索引
 /*!< CAN 控制及状态寄存器族 */
 /*******************   MCR 主控制寄存器  ********************/
 #define  bCAN_MCR_INRQ(CANx_BASE)  		BIT_ADDR(CANx_BASE,0) 	 /*!< Initialization Request */
@@ -1607,7 +1798,7 @@
 /*                      I2C接口                                               */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bI2C_i									//定位索引
 /*******************  I2C_CR1 控制寄存器  ********************/
 #define  bI2C_CR_PE(I2Cx_BASE)            BIT_ADDR(I2Cx_BASE +0x00,0)            /*!< Peripheral Enable */
 #define  bI2C_CR_SMBUS(I2Cx_BASE )         BIT_ADDR(I2Cx_BASE +0x00,1)            /*!< SMBus Mode */
@@ -1694,6 +1885,7 @@
 /*                             DMA 控制器                                     */
 /*                                                                            */
 /******************************************************************************/
+#define  bDMA_i									//定位索引
 //每个DMA控制器外设实际上是由最大7个相互独立的DMA通道组成
 //这里用宏参数n表示DMA通道号，n=1-7
 /*******************   DMA_ISR 寄存器 ********************/
@@ -1746,7 +1938,7 @@
 /*                        ADC模数转换器                                       */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bADC_i									//定位索引
 /********************   ADC_SR 寄存器 ********************/
 #define  bADC_SR_AWD(ADCx_BASE)      BIT_ADDR(ADCx_BASE+0x00,0)               /*!< 模拟狗标志位 */
 #define  bADC_SR_EOC(ADCx_BASE)      BIT_ADDR(ADCx_BASE+0x00,1)               /*!< 转换结束（EOC）*/
@@ -1778,12 +1970,12 @@
 
   
 /*******************   ADC_CR2 寄存器 ********************/
-#define  bADC_CR_ADON(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,0)        /*!< A/D 转换器开启或关闭 */
-#define  bADC_CR_CONT(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,1)        /*!< 连续转换 */
-#define  bADC_CR_CAL(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,2)        /*!< A/D 校准 */
-#define  bADC_CR_RSTCAL(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,3)        /*!< 复位校准寄存器 */
-#define  bADC_CR_DMA(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,8)        /*!< DMA模式 */
-#define  bADC_CR_ALIGN(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,11)        /*!< 数据对齐方式 */
+#define  bADC_CR_ADON(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,0)        		/*!< A/D 转换器开启或关闭 */
+#define  bADC_CR_CONT(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,1)        		/*!< 连续转换 */
+#define  bADC_CR_CAL(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,2)        		/*!< A/D 校准 */
+#define  bADC_CR_RSTCAL(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,3)        	/*!< 复位校准寄存器 */
+#define  bADC_CR_DMA(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,8)        		/*!< DMA模式 */
+#define  bADC_CR_ALIGN(ADCx_BASE)     BIT_ADDR(ADCx_BASE+0x08,11)        	/*!< 数据对齐方式 */
 
 //#define  ADC_CR2_JEXTSEL                     ((uint32_t)0x00007000)        /*!< JEXTSEL[2:0] bits (External event select for injected group) */
 #define  SET_ADC_CR_JEXTSEL(ADCx_BASE,a)   SET_REG_BITn(ADCx_BASE+0x08,12,MASKb3,a)
@@ -1902,6 +2094,7 @@
 /*                      DAC数模转换器                                         */
 /*                                                                            */
 /******************************************************************************/
+#define  bDAC_i									//定位索引
 //注：一般芯片只有一个DAC外设，为兼容多个DAC，这里仍采用DACx的形式，引用时请加参数bDAC，与ADC、USART等外设一致。
 #define bDAC	DAC_BASE
 /********************   DAC_CR 寄存器 ******************00**/
@@ -1990,7 +2183,7 @@
 /*                          SDIO接口                                          */
 /*                                                                            */
 /******************************************************************************/
-
+#define  bSDIO_i									//定位索引
 /******************  SDIO_POWER 寄存器  ******************/
            
 #define  SET_SDIO_POWER_PWRCTRL(a)	SET_REG_BITn(SDIO_BASE,0,MASKb2,a)		/*!< PWRCTRL[1:0] bits (Power supply control bits) */
@@ -2134,19 +2327,58 @@
 /******************  SDIO_FIFO 寄存器  *******************/
 #define  wSDIO_FIFO               (MEM_ADDR(SDIO_BASE+0x80))       /*!< Receive and transmit FIFO data */
 
+/*************************************************************************************/
+#define  bREG_i									//定位索引
+//本文件对于寄存器的多位访问使用了如下定义，其实多BIT位的访问已经无法使用位段操作，
+//但是为了满足多BIT的访问需求，而使用了传统的读--改--写的方式，因此也不再局限于该寄存器是否可被位段访问，
+//可适用于任何存储器，只要提供32位的地址即可使用：
+//#define SET_REG_BITn(REG_ADDR,Sbit,MASKn,a)  	(MEM_ADDR(REG_ADDR)=(MEM_ADDR(REG_ADDR)&(~(MASKn<<Sbit)))|((a & MASKn)<<Sbit))
+//#define GET_REG_BITn(REG_ADDR,Sbit,MASKn)   	((MEM_ADDR(REG_ADDR)>>Sbit)& MASKn)
+
+//
+//作为上面的特例，当MASKn=1时，即由多BIT退化成单BIT，可以满足需要修改寄存器或存储器某一BIT位的场合，
+//简化上述宏定义，扩充定义如下三个用于操作单BIT位的宏，以备非位段操作用（本文件没有用到）：
+#define SETb_REG_BIT(REG_ADDR,Sbit)  			(MEM_ADDR(REG_ADDR)=(MEM_ADDR(REG_ADDR)|(MASKb1<<Sbit)))
+#define RESETb_REG_BIT(REG_ADDR,Sbit)  		(MEM_ADDR(REG_ADDR)=(MEM_ADDR(REG_ADDR)&(~(MASKb1<<Sbit))))
+#define GETb_REG_BIT(REG_ADDR,Sbit)   		((MEM_ADDR(REG_ADDR)>>Sbit)& MASKb1)
+
+//以上的宏定义，其参数为寄存器的地址，还可以有下述以寄存器的名称为参数的宏定义：
+#define SET_REGNAME_BITn(REG,Sbit,MASKn,a)  	(REG =( REG & (~(MASKn<<Sbit)))|((a & MASKn)<<Sbit))
+#define GET_REGNAME_BITn(REG,Sbit,MASKn)   		((REG>>Sbit)& MASKn)
+
+#define SETb_REGNAME_BIT(REG,Sbit)  			(REG =(REG |(MASKb1<<Sbit)))
+#define RESETb_REGNAME_BIT(REG,Sbit)  		(REG =REG & (~(MASKb1<<Sbit)))
+#define GETb_REGNAME_BIT(REG,Sbit)   			((REG>>Sbit)& MASKb1)
+//例如：SETb_REG_BIT((u32)SysTick+0x00,0); 	//CTRL寄存器的地址偏移量为0x00
+//或者  SETb_REGNAME_BIT(SysTick->CTRL,0);	//即可使能SysTick定时器
 
 #endif
 /*********************************************************************************************
 以下附记一下当不用本文件的位段操作时，使用逻辑运算实现相关操作的基本方法
 
+
 单比特的操作方法（实例中n=9）：
-RCC->APB2ENR|=1<<n;    		//置相应寄存器的第n比特为1，对应的位段操作为：bRCC_ENABLE_ADC1=1;	
-RCC->APB2ENR&=~(1<<n);   	//置相应寄存器的第n比特为0，对应的位段操作为：bRCC_ENABLE_ADC1=0;
+RCC->APB2ENR|=1<<n;    		//置APB2ENR寄存器的第n比特为1，对应的位段操作为：bRCC_ENABLE_ADC1=1;	
+RCC->APB2ENR&=~(1<<n);   	//置APB2ENR寄存器的第n比特为0，对应的位段操作为：bRCC_ENABLE_ADC1=0;
 
 多比特的操作方法（实例中n=18）：
-RCC->CFGR&=~(MASKb4<<n);   	//先清除相应寄存器的从第n比特开始的连续4个比特
+RCC->CFGR&=~(MASKb4<<n);   	//先清除CFGR寄存器的从第n比特开始的连续4个比特
 RCC->CFGR|=a<<n;  					//再把上述的比特位的值设置为a(注意a的值不可超出4比特的值域，即0－15)
-														//以上示例为连续4个比特，不同比特数请修改MASKb4为MASKbx
+														//以上示例为连续4个比特，不同比特数须修改MASKb4为MASKbx
 					//以上两句对应的位段操作为：SET_RCC_PLLMUL(a);
+					
+可以对比体会使用本文操作方法的优势：
+1、无须记忆所需操作的BIT位在原有寄存器中的位置（即上例中的n值，基本每次都要去查手册反复核实，这是
+使用寄存器编程最头大的工作）；
+2、无须记忆所需要的功能在外设的具体哪个寄存器上。比如上例中需要使能ADC1的时钟，它在APB2ENR还是在
+APB1ENR还是在AHBEN寄存器中（这也是使用寄存器编程比较烦琐的工作，极易出错并且难以排查）；
+3、无论是单BIT置1或清0，还是多BIT位设置为某个值，均编写直观，便于理解；
+4、助记符意义明确，使得代码简单易懂，可在很大程度上省去注释的工作；如果有兴趣者在本文件的基础上再
+进行二次封装，就能使得代码更加易记易用且可读性强；
+5、位段操作精准高效，可缩短目标代码长度，执行速度快；
+6、便于移植，对于多个类似功能的外设，比如串口、定时器，当需要把TIM2换成TIM3时，几乎可以达到不用
+修改代码就可以实现；
+7、可以与寄存器编程、标准库、HAL库混合编程，并且只须在工程中包含这一个头文件就可以了。稍有寄存器
+编程的基础，熟悉一下本文件的内容后完全可以抛开标准库、HAL库自由发挥了。
 
 ***************************************************************************************/
