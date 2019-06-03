@@ -46,10 +46,9 @@ STM32 CM3 Project
 拿前不久我使用的一个从STOP模式中快速恢复时钟的函数为例，
 库函数版本如下：
 
-/**
-  * 本函数用于从STOP模式唤醒后重新配置系统时钟：使能HSE，PLL并选择PLL作为系统时钟源
-  *         
-  */
+/*
+  本函数用于从STOP模式唤醒后重新配置系统时钟：使能HSE，PLL并选择PLL作为系统时钟源    
+*/
   
 static void SYSCLKConfig_STOP(void)
 
