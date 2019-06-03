@@ -90,6 +90,7 @@ while (RCC_GetSYSCLKSource() != 0x08)
 }
 
 
+//*****************************************************************
 
 //引入位段操作宏定义后，可以改写成：
 
@@ -100,6 +101,7 @@ static void SYSCLKConfig_STOP(void)
 {  
   bRCC_CR_HSEON=YES;         
   while (! bRCC_CR_HSERDY);
+  
   bRCC_CR_PLLON=YES;          
   while(! bRCC_CR_PLLRDY);     
   bRCC_CFGR_SW_PLL=YES;          
