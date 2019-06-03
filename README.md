@@ -62,16 +62,19 @@ static void SYSCLKConfig_STOP(void)
   
  
  /* 等待HSE时钟就绪 */
-  while (RCC_GetFlagStatus(RCC_FLAG_HSERDY) == RESET)
+ 
+ while (RCC_GetFlagStatus(RCC_FLAG_HSERDY) == RESET)
   {}
   
  
  /* 使能PLL */
-  RCC_PLLCmd(ENABLE);
+ 
+ RCC_PLLCmd(ENABLE);
   
  
  /* 等待PLL就绪 */
-  while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
+ 
+ while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
   {}
  
  
@@ -80,6 +83,7 @@ static void SYSCLKConfig_STOP(void)
 
 
 /* 等待时钟源配置就绪 */
+
 while (RCC_GetSYSCLKSource() != 0x08)
   {}
 
@@ -103,4 +107,6 @@ static void SYSCLKConfig_STOP(void)
 
 //怎么样？ 非常简洁！！！
 //不仅程序简洁，方便书写，而且可读性也非常强。 
-//看起来就像自然描述语言一样，但却非常底层，远远超越了寄存器版本的高效。
+//看起来就像自然描述语言一样，但却非常底层，
+//与库函数版本相比，没有调用任何一个子程序，
+//同时也远远超越了寄存器版本的高效。
