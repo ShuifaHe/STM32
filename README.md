@@ -36,7 +36,7 @@ STM32 CM3 Project
 		val=GET_RCC_PLLMUL;(获取PLL倍频设置值)		读
 
 		SET_SPI_CR_BR(bSPIx,a);	(设置bSPIx接口的速率值为a)	写	//多组外设
-		val=GET_SPI_CR_BR(bSPIx);(获取bSPIx接口的速率值)	     读
+		val=GET_SPI_CR_BR(bSPIx);(获取bSPIx接口的速率值)	       读
 
 寄存器整体访问方式：一般仍沿用传统的寄存器直接访问方式，如BKP->DR1			
 ************************************************************************
